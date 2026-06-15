@@ -18,7 +18,15 @@ import {
 import { extractCommitmentsWithGemini } from '@/lib/gemini';
 import { sendEmailWithResend } from '@/lib/resend';
 
+import { createClient } from '@/utils/supabase/client';
+import { User } from '@supabase/supabase-js';
+
 interface AppContextValue {
+  // Supabase Auth
+  user: User | null;
+  supabaseUserLoading: boolean;
+  signOut: () => Promise<void>;
+
   // Mode
   isLiveMode: boolean;
   setLiveMode: (v: boolean) => void;
@@ -39,7 +47,7 @@ interface AppContextValue {
   notifications: NotificationLog[];
   stats: AppStats;
 
-  // User
+  // User (Legacy mock user)
   currentUser: TeamMember;
   setCurrentUser: (m: TeamMember) => void;
 
@@ -60,6 +68,9 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const supabase = createClient();
+  const [user, setUser] = useState<User | null>(null);
+  const [supabaseUserLoading, setSupabaseUserLoading] = useState(true);
   const [isLiveMode, setIsLiveModeState] = useState(false);
   const [geminiKey, setGeminiKeyState] = useState('');
   const [resendKey, setResendKeyState] = useState('');
@@ -284,8 +295,31 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return extractCommitmentsWithGemini(transcript, geminiKey);
   }, [geminiKey]);
 
+  useEffect(() => {
+    // Initial fetch
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setSupabaseUserLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+      setSupabaseUserLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [supabase.auth]);
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    showToast('Signed out successfully', 'info');
+  };
+
   return (
     <AppContext.Provider value={{
+      user, supabaseUserLoading, signOut,
       isLiveMode, setLiveMode,
       geminiKey, setGeminiKey,
       resendKey, setResendKey,

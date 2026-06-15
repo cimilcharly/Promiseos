@@ -25,20 +25,8 @@ const FEATURES = [
 export default function LandingPage() {
   const router = useRouter();
   const { showToast } = useApp();
-  const [showAuth, setShowAuth] = useState(false);
-  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [org, setOrg] = useState('');
-
   const handleEnterDemo = () => {
     showToast('👋 Welcome to PromiseOS Demo — Apex Digital Agency loaded!', 'success');
-    router.push('/dashboard');
-  };
-
-  const handleAuth = (e: React.FormEvent) => {
-    e.preventDefault();
-    showToast('🔐 Auth coming soon — entering demo mode', 'info');
     router.push('/dashboard');
   };
 
@@ -102,7 +90,7 @@ export default function LandingPage() {
             style={{ fontSize: '1rem', padding: '13px 28px', display: 'flex', alignItems: 'center', gap: 8 }}>
             Enter Demo <ArrowRight size={16} />
           </button>
-          <button className="btn-secondary" id="signup-btn" onClick={() => { setShowAuth(true); setAuthMode('signup'); }}
+          <button className="btn-secondary" id="signup-btn" onClick={() => router.push('/login')}
             style={{ fontSize: '1rem', padding: '13px 28px' }}>
             Create Free Account
           </button>
@@ -209,75 +197,5 @@ export default function LandingPage() {
           ))}
         </motion.div>
       </div>
-
-      {/* Auth Modal */}
-      <AnimatePresence>
-        {showAuth && (
-          <div style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          }} onClick={() => setShowAuth(false)}>
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 15 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 15 }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="glass-card"
-              style={{ width: '100%', maxWidth: 420, padding: 36, margin: 16 }}
-              onClick={e => e.stopPropagation()}
-            >
-              <div style={{ textAlign: 'center', marginBottom: 28 }}>
-                <div style={{
-                  width: 48, height: 48, background: 'linear-gradient(135deg,#00d4ff,#7c3aed)',
-                  borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px',
-                }}>
-                  <Zap size={22} color="white" fill="white" />
-                </div>
-                <h2 style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 700, fontSize: '1.4rem', marginBottom: 4 }}>
-                  {authMode === 'signin' ? 'Sign In' : 'Create Account'}
-                </h2>
-                <p style={{ color: '#8899bb', fontSize: '0.85rem' }}>
-                  {authMode === 'signin' ? 'Welcome back to PromiseOS' : 'Start your accountability journey'}
-                </p>
-              </div>
-
-              <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                {authMode === 'signup' && (
-                  <div>
-                    <label style={{ fontSize: '0.8rem', color: '#8899bb', display: 'block', marginBottom: 6 }}>Organization Name</label>
-                    <input id="org-input" className="input-field" placeholder="Apex Digital Agency" value={org} onChange={e => setOrg(e.target.value)} />
-                  </div>
-                )}
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#8899bb', display: 'block', marginBottom: 6 }}>Email</label>
-                  <input id="email-input" className="input-field" type="email" placeholder="you@company.com" value={email} onChange={e => setEmail(e.target.value)} />
-                </div>
-                <div>
-                  <label style={{ fontSize: '0.8rem', color: '#8899bb', display: 'block', marginBottom: 6 }}>Password</label>
-                  <input id="password-input" className="input-field" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} />
-                </div>
-                <button id="auth-submit-btn" className="btn-primary" type="submit" style={{ width: '100%', padding: '12px', fontSize: '0.95rem', marginTop: 4 }}>
-                  {authMode === 'signin' ? 'Sign In' : 'Create Account'}
-                </button>
-                <button type="button" className="btn-ghost" id="enter-demo-modal-btn" onClick={handleEnterDemo}
-                  style={{ width: '100%', color: '#8899bb', fontSize: '0.85rem' }}>
-                  Continue with Demo Mode instead →
-                </button>
-              </form>
-
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', marginTop: 20, paddingTop: 16, textAlign: 'center' }}>
-                <span style={{ fontSize: '0.8rem', color: '#8899bb' }}>
-                  {authMode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-                </span>
-                <button className="btn-ghost" style={{ fontSize: '0.8rem', padding: '2px 6px', color: '#00d4ff' }}
-                  onClick={() => setAuthMode(authMode === 'signin' ? 'signup' : 'signin')}>
-                  {authMode === 'signin' ? 'Sign Up' : 'Sign In'}
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </div>
   );
 }

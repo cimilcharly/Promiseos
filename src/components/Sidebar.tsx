@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, LayoutGrid, Upload, Users, Settings,
-  Zap, Activity, ChevronRight,
+  Zap, Activity, ChevronRight, LogOut,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 
@@ -20,7 +20,7 @@ const NAV_ITEMS = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { organization, currentUser, isLiveMode, stats } = useApp();
+  const { organization, currentUser, isLiveMode, stats, user, signOut } = useApp();
 
   return (
     <aside className="sidebar">
@@ -112,21 +112,39 @@ export default function Sidebar() {
       </div>
 
       {/* User */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{
-          width: 32, height: 32, borderRadius: '50%',
-          background: 'linear-gradient(135deg, #7c3aed, #00d4ff)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: '0.75rem', fontWeight: 700, color: 'white', flexShrink: 0,
-        }}>
-          {currentUser.name.split(' ').map(n => n[0]).join('')}
-        </div>
-        <div style={{ overflow: 'hidden' }}>
-          <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f0f6ff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {currentUser.name}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, overflow: 'hidden' }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: '50%',
+            background: 'linear-gradient(135deg, #7c3aed, #00d4ff)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: '0.75rem', fontWeight: 700, color: 'white', flexShrink: 0,
+          }}>
+            {user?.email?.charAt(0).toUpperCase() || currentUser.name.charAt(0)}
           </div>
-          <div style={{ fontSize: '0.7rem', color: '#4a5a7a' }}>{currentUser.role}</div>
+          <div style={{ overflow: 'hidden' }}>
+            <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f0f6ff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {user?.email || currentUser.name}
+            </div>
+            <div style={{ fontSize: '0.7rem', color: '#4a5a7a' }}>
+              {user ? 'Authenticated User' : currentUser.role}
+            </div>
+          </div>
         </div>
+
+        {user && (
+          <button
+            onClick={signOut}
+            title="Sign Out"
+            style={{
+              background: 'rgba(244, 63, 94, 0.1)', border: 'none', borderRadius: 8,
+              width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              cursor: 'pointer', color: '#f43f5e', flexShrink: 0,
+            }}
+          >
+            <LogOut size={14} />
+          </button>
+        )}
       </div>
     </aside>
   );
