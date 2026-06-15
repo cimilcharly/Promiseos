@@ -197,5 +197,6 @@ export default function LandingPage() {
           ))}
         </motion.div>
       </div>
+    </div>
   );
 }
