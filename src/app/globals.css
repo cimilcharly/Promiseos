@@ -102,15 +102,16 @@ h1, h2, h3, h4, h5 {
   font-weight: 600;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
-.btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 30px rgba(0, 212, 255, 0.3);
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 212, 255, 0.35);
 }
-.btn-primary:active { transform: translateY(0); }
+.btn-primary:active:not(:disabled) { transform: translateY(0); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
 
 .btn-secondary {
   background: var(--bg-glass);
@@ -122,11 +123,12 @@ h1, h2, h3, h4, h5 {
   font-weight: 500;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .btn-secondary:hover {
   background: var(--bg-glass-hover);
   border-color: rgba(255,255,255,0.12);
+  transform: translateY(-1px);
 }
 
 .btn-ghost {
@@ -194,8 +196,17 @@ h1, h2, h3, h4, h5 {
   font-family: 'Inter', sans-serif;
   font-size: 0.875rem;
   width: 100%;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   outline: none;
+}
+.input-field:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+.input-field:focus {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--border-glow);
+  box-shadow: 0 0 16px rgba(0, 212, 255, 0.15);
 }
 .input-field::placeholder { color: var(--text-muted); }
 .input-field:focus {

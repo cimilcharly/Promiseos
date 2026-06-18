@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { Shield, Mail, Lock, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 
@@ -185,19 +185,27 @@ export default function LoginPage() {
           </motion.div>
         )}
 
-        {!confirmEmail && (
-          <>
-            <button
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              style={{
-                width: '100%', padding: '12px', marginBottom: 24,
-                background: 'white', color: '#1a1b2e', fontWeight: 600, fontSize: '0.95rem',
-                border: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
-                cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
-              }}
+        <AnimatePresence mode="wait">
+          {!confirmEmail && (
+            <motion.div
+              key="google-divider"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
             >
+              <motion.button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={loading}
+                whileHover={{ y: -2 }}
+                whileTap={{ scale: 0.98 }}
+                style={{
+                  width: '100%', padding: '12px', marginBottom: 24,
+                  background: 'white', color: '#1a1b2e', fontWeight: 600, fontSize: '0.95rem',
+                  border: 'none', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
+                  cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
+                }}
+              >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
                 <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
@@ -205,29 +213,42 @@ export default function LoginPage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
               Continue with Google
-            </button>
+              </motion.button>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
-              <span style={{ fontSize: '0.8rem', color: '#8899bb' }}>or continue with email</span>
-              <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
-            </div>
-          </>
-        )}
+              <motion.div
+                initial={{ scaleX: 0 }}
+                animate={{ scaleX: 1 }}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, originX: 0 }}
+              >
+                <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+                <span style={{ fontSize: '0.8rem', color: '#8899bb', whiteSpace: 'nowrap' }}>or continue with email</span>
+                <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-        {confirmEmail ? (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            style={{ textAlign: 'center', padding: '20px 0' }}
-          >
-            <div style={{ fontSize: '0.95rem', color: '#8899bb', lineHeight: 1.6 }}>
-              Redirecting to login in 3 seconds...
-            </div>
-          </motion.div>
-        ) : (
-        <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {!isLogin && (
+        <AnimatePresence mode="wait">
+          {confirmEmail ? (
+            <motion.div
+              key="confirm-email"
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              style={{ textAlign: 'center', padding: '20px 0' }}
+            >
+              <motion.div
+                animate={{ y: [0, -5, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                style={{ fontSize: '0.95rem', color: '#8899bb', lineHeight: 1.6 }}
+              >
+                Redirecting to login in 3 seconds...
+              </motion.div>
+            </motion.div>
+          ) : (
+            <form key="auth-form" onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              {!isLogin && (
             <div>
               <label style={{ display: 'block', fontSize: '0.8rem', color: '#8899bb', marginBottom: 6 }}>Organization Name</label>
               <div style={{ position: 'relative' }}>
@@ -276,30 +297,50 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <button
+          <motion.button
             type="submit"
             className="btn-primary"
             disabled={loading}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             style={{
               marginTop: 8, padding: '14px', fontSize: '0.95rem',
               display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
               width: '100%',
             }}
           >
-            {loading ? <Loader2 size={18} className="animate-spin" /> : <>{isLogin ? 'Sign In' : 'Create Account'} <ArrowRight size={16} /></>}
-          </button>
-        </form>
-        )}
+            {loading ? (
+              <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity }}>
+                <Loader2 size={18} />
+              </motion.div>
+            ) : (
+              <>
+                {isLogin ? 'Sign In' : 'Create Account'}
+                <motion.div animate={{ x: [0, 4, 0] }} transition={{ duration: 1.5, repeat: Infinity }}>
+                  <ArrowRight size={16} />
+                </motion.div>
+              </>
+            )}
+          </motion.button>
+            </form>
+          )}
+        </AnimatePresence>
 
-        <div style={{ marginTop: 24, textAlign: 'center', fontSize: '0.85rem', color: '#8899bb' }}>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          style={{ marginTop: 24, textAlign: 'center', fontSize: '0.85rem', color: '#8899bb' }}
+        >
           {isLogin ? "Don't have an account? " : "Already have an account? "}
-          <button
+          <motion.button
+            whileHover={{ color: '#00d4ff', scale: 1.05 }}
             onClick={() => { setIsLogin(!isLogin); setError(null); setEmail(''); setPassword(''); setOrgName(''); setConfirmEmail(false); }}
             style={{ background: 'none', border: 'none', color: '#00d4ff', fontWeight: 600, cursor: 'pointer' }}
           >
             {isLogin ? 'Sign up' : 'Log in'}
-          </button>
-        </div>
+          </motion.button>
+        </motion.div>
       </motion.div>
     </div>
   );
