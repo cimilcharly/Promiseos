@@ -6,8 +6,8 @@ import { DEMO_MEMBERS } from './mockData';
 export async function extractCommitmentsWithGemini(
   transcript: string,
   apiKey: string | null,
-  modelName: string = 'gemini-1.5-flash',
-  confidenceThreshold: number = 0.75
+  modelName: string = 'gemini-2.0-flash',
+  confidenceThreshold: number = 0.7
 ): Promise<ExtractedCommitment[]> {
   // If API Key is not set, run mock simulation
   if (!apiKey || !apiKey.trim() || apiKey === 'mock-key') {

@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/set-state-in-effect, @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
 'use client';
 // src/contexts/AppContext.tsx
 // Provides global app state: commitments, meetings, notifications, members, mode and credentials
@@ -13,13 +14,28 @@ import {
 import {
   initFirebase, isFirebaseReady, getCommitmentsDb, saveCommitmentDb,
   updateCommitmentDb, deleteCommitmentDb, getMeetingsDb, saveMeetingDb,
-  getNotificationsDb, saveNotificationDb
+  getNotificationsDb, saveNotificationDb, getMembersDb, getOrganizationDb,
+  updateOrganizationDb,
+  getNotificationSettings, saveNotificationSettings, NotificationSettings,
+  getAISettings, saveAISettings, AISettings,
 } from '@/lib/db';
 import { extractCommitmentsWithGemini } from '@/lib/gemini';
 import { sendEmailWithResend } from '@/lib/resend';
 
 import { createClient } from '@/utils/supabase/client';
 import { User } from '@supabase/supabase-js';
+
+// Helper function to generate valid UUIDs on the client
+function generateUuid(): string {
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 
 interface AppContextValue {
   // Supabase Auth
@@ -52,17 +68,24 @@ interface AppContextValue {
   setCurrentUser: (m: TeamMember) => void;
 
   // Actions
-  addCommitment: (c: Omit<Commitment, 'id' | 'createdAt'>) => void;
+  addCommitment: (c: Omit<Commitment, 'id' | 'createdAt'> & { id?: string }) => void;
   updateCommitmentStatus: (id: string, status: CommitmentStatus) => void;
   deleteCommitment: (id: string) => void;
   importCommitments: (items: ExtractedCommitment[], meetingId: string, meetingTitle: string) => void;
-  addMeeting: (m: Omit<Meeting, 'id' | 'uploadedAt'>) => void;
+  addMeeting: (m: Omit<Meeting, 'id' | 'uploadedAt'> & { id?: string }) => void;
   sendSimulatedReminder: (commitmentId: string, recipientName: string) => void;
   triggerSimulatedExtraction: (transcript: string, title: string) => Promise<ExtractedCommitment[]>;
 
   // Toast
   toast: { message: string; type: 'success' | 'error' | 'info' } | null;
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+
+  // Settings
+  notificationSettings: NotificationSettings;
+  updateNotificationSettings: (s: Partial<NotificationSettings>) => void;
+  aiSettings: AISettings;
+  updateAISettings: (s: Partial<AISettings>) => void;
+  saveOrgSettings: (name: string, industry: string, plan?: 'starter' | 'growth' | 'business') => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -78,11 +101,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [members] = useState<TeamMember[]>(DEMO_MEMBERS);
-  const [organization] = useState<Organization>(DEMO_ORGANIZATION);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [organization, setOrganization] = useState<Organization>(DEMO_ORGANIZATION);
   const [notifications, setNotifications] = useState<NotificationLog[]>([]);
   const [currentUser, setCurrentUser] = useState<TeamMember>(DEMO_MEMBERS[1]);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [notificationSettings, setNotificationSettings] = useState<NotificationSettings>(getNotificationSettings());
+  const [aiSettings, setAISettings] = useState<AISettings>(getAISettings());
 
   const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'success') => {
     setToast({ message, type });
@@ -124,32 +149,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setFirebaseConfigState(fConfig);
   }, []);
 
-  // 2. Load data based on Live Mode & Firebase status
+  // 2. Load data based on Auth & User Status
   const loadData = useCallback(async () => {
-    let firebaseActive = false;
-    if (isLiveMode && firebaseConfig) {
-      firebaseActive = initFirebase(firebaseConfig);
-    }
+    if (user) {
+      try {
+        const dbCommitments = await getCommitmentsDb();
+        const dbMeetings = await getMeetingsDb();
+        const dbNotifs = await getNotificationsDb();
+        const dbMembers = await getMembersDb();
+        const dbOrg = await getOrganizationDb();
 
-    if (isLiveMode && firebaseActive && isFirebaseReady()) {
-      const dbCommitments = await getCommitmentsDb();
-      const dbMeetings = await getMeetingsDb();
-      const dbNotifs = await getNotificationsDb();
-      
-      setCommitments(dbCommitments);
-      setMeetings(dbMeetings);
-      setNotifications(dbNotifs);
+        setCommitments(dbCommitments);
+        setMeetings(dbMeetings);
+        setNotifications(dbNotifs);
+        
+        if (dbMembers.length > 0) {
+          setMembers(dbMembers);
+          // Set current user context to logged-in profile if matching email
+          const currentProfile = dbMembers.find(m => m.email === user.email);
+          if (currentProfile) {
+            setCurrentUser(currentProfile);
+          } else {
+            setCurrentUser(dbMembers[0]);
+          }
+        }
+        
+        if (dbOrg) {
+          setOrganization(dbOrg);
+        }
+      } catch (err) {
+        console.error('Failed to load multi-tenant Supabase data:', err);
+      }
     } else {
       // Fallback to localStorage data or demo defaults if empty
       const localCommitments = await getCommitmentsDb();
       const localMeetings = await getMeetingsDb();
       const localNotifs = await getNotificationsDb();
 
+      setMembers(DEMO_MEMBERS);
+      setOrganization(DEMO_ORGANIZATION);
+      setCurrentUser(DEMO_MEMBERS[1]);
+
       if (localCommitments.length === 0 && localMeetings.length === 0) {
-        // Hydrate local storage with demo data on first load
-        localStorage.setItem('promiseos_commitments', JSON.stringify(DEMO_COMMITMENTS));
-        localStorage.setItem('promiseos_meetings', JSON.stringify(DEMO_MEETINGS));
-        localStorage.setItem('promiseos_notifications', JSON.stringify(DEMO_NOTIFICATIONS));
         setCommitments(DEMO_COMMITMENTS);
         setMeetings(DEMO_MEETINGS);
         setNotifications(DEMO_NOTIFICATIONS);
@@ -159,7 +200,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setNotifications(localNotifs);
       }
     }
-  }, [isLiveMode, firebaseConfig]);
+  }, [user]);
 
   useEffect(() => {
     loadData();
@@ -183,17 +224,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       : 0,
   };
 
-  const addCommitment = useCallback(async (c: Omit<Commitment, 'id' | 'createdAt'>) => {
-    const newC: Commitment = {
+  const addCommitment = useCallback(async (c: Omit<Commitment, 'id' | 'createdAt'> & { id?: string }) => {
+    const newC = {
       ...c,
-      id: `c-${Date.now()}`,
+      id: c.id || generateUuid(),
       createdAt: new Date().toISOString().split('T')[0],
     };
     
-    // Save to Firestore or localStorage
     await saveCommitmentDb(newC);
     
-    // Reload state from database
     const dbCommitments = await getCommitmentsDb();
     setCommitments(dbCommitments);
     showToast(`✅ Commitment added: "${c.task.slice(0, 40)}..."`);
@@ -220,8 +259,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [showToast]);
 
   const importCommitments = useCallback(async (items: ExtractedCommitment[], meetingId: string, meetingTitle: string) => {
-    const newOnes: Commitment[] = items.map((item, i) => ({
-      id: `c-import-${Date.now()}-${i}`,
+    const newOnes = items.map((item, i) => ({
+      id: generateUuid(),
       task: item.task,
       owner: item.owner,
       deadline: item.deadline,
@@ -244,10 +283,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     showToast(`🚀 Imported ${items.length} commitment${items.length > 1 ? 's' : ''} from meeting`);
   }, [showToast]);
 
-  const addMeeting = useCallback(async (m: Omit<Meeting, 'id' | 'uploadedAt'>) => {
-    const newM: Meeting = {
+  const addMeeting = useCallback(async (m: Omit<Meeting, 'id' | 'uploadedAt'> & { id?: string }) => {
+    const newM = {
       ...m,
-      id: `m-${Date.now()}`,
+      id: m.id || generateUuid(),
       uploadedAt: new Date().toISOString().split('T')[0],
     };
     await saveMeetingDb(newM);
@@ -262,13 +301,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const subject = `🔔 Reminder: ${c.task.slice(0, 50)}`;
     const body = `Hi ${recipientName},\n\nYou committed to: "${c.task}" during our meeting.\nDeadline: ${c.deadline}.\n\nPlease update your progress on PromiseOS.`;
     
-    // Call Resend (calls proxy /api/send-email if API Key exists, or runs console simulation)
     const success = await sendEmailWithResend(resendKey, 'recipient@example.com', subject, body);
 
     if (success) {
-      const notif: NotificationLog = {
-        id: `n-${Date.now()}`,
-        type: 'reminder',
+      const notif = {
+        id: generateUuid(),
+        type: 'reminder' as const,
         recipient: recipientName,
         subject,
         body,
@@ -292,8 +330,40 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // AI Extraction parsing (calls real Gemini API if key exists, or simulated parser)
   const triggerSimulatedExtraction = useCallback(async (transcript: string, _title: string): Promise<ExtractedCommitment[]> => {
-    return extractCommitmentsWithGemini(transcript, geminiKey);
-  }, [geminiKey]);
+    return extractCommitmentsWithGemini(transcript, geminiKey, aiSettings.model, aiSettings.confidenceThreshold);
+  }, [geminiKey, aiSettings]);
+
+  // Settings helpers
+  const updateNotificationSettings = useCallback((updates: Partial<NotificationSettings>) => {
+    setNotificationSettings(prev => {
+      const next = { ...prev, ...updates };
+      saveNotificationSettings(next);
+      return next;
+    });
+  }, []);
+
+  const updateAISettings = useCallback((updates: Partial<AISettings>) => {
+    setAISettings(prev => {
+      const next = { ...prev, ...updates } as AISettings;
+      saveAISettings(next);
+      return next;
+    });
+  }, []);
+
+  const saveOrgSettings = useCallback(async (name: string, industry: string, plan?: 'starter' | 'growth' | 'business') => {
+    const updates: any = { name, industry };
+    if (plan) updates.plan = plan;
+
+    if (user) {
+      await updateOrganizationDb(updates);
+    }
+    setOrganization(prev => {
+      const next = { ...prev, name, industry };
+      if (plan) next.plan = plan;
+      return next;
+    });
+    showToast('✅ Organization settings saved', 'success');
+  }, [user, showToast]);
 
   useEffect(() => {
     // Initial fetch
@@ -306,6 +376,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setSupabaseUserLoading(false);
+
+      if (session?.user && typeof window !== 'undefined') {
+        const inviteToken = sessionStorage.getItem('promiseos_invite_token');
+        if (inviteToken) {
+          window.location.href = `/invite?token=${inviteToken}`;
+        }
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -330,6 +407,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       importCommitments, addMeeting,
       sendSimulatedReminder, triggerSimulatedExtraction,
       toast, showToast,
+      notificationSettings, updateNotificationSettings,
+      aiSettings, updateAISettings,
+      saveOrgSettings,
     }}>
       {children}
     </AppContext.Provider>

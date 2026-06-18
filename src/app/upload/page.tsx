@@ -24,7 +24,7 @@ const SAMPLE_TRANSCRIPT = `[00:01:05] John Patel: Good morning everyone. Let's g
 type ExtractionState = 'idle' | 'uploading' | 'processing' | 'done' | 'error';
 
 export default function UploadPage() {
-  const { triggerSimulatedExtraction, importCommitments, addMeeting, meetings, showToast } = useApp();
+  const { triggerSimulatedExtraction, importCommitments, addMeeting, meetings, showToast, organization } = useApp();
 
   const [dragOver, setDragOver] = useState(false);
   const [transcript, setTranscript] = useState('');
@@ -36,6 +36,7 @@ export default function UploadPage() {
   const [editedItems, setEditedItems] = useState<ExtractedCommitment[]>([]);
   const [removedIds, setRemovedIds] = useState<Set<number>>(new Set());
   const [showTranscript, setShowTranscript] = useState(false);
+  const [currentMeetingId, setCurrentMeetingId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFile = useCallback((file: File) => {
@@ -68,6 +69,13 @@ export default function UploadPage() {
     if (!transcript.trim()) { showToast('Please add a transcript first', 'error'); return; }
     if (!meetingTitle.trim()) { showToast('Please enter a meeting title', 'error'); return; }
 
+    // Check billing limit before extracting
+    const limit = organization.plan === 'starter' ? 10 : organization.plan === 'growth' ? 50 : Infinity;
+    if (meetings.length >= limit) {
+      showToast(`⚠️ Plan limit reached! You have processed ${meetings.length} of ${limit} transcripts. Please upgrade your plan in Settings.`, 'error');
+      return;
+    }
+
     setState('uploading');
     setProgress(20);
 
@@ -88,8 +96,13 @@ export default function UploadPage() {
       setRemovedIds(new Set());
       setState('done');
 
+      // Generate UUID to link meeting with commitments
+      const mtgId = crypto.randomUUID();
+      setCurrentMeetingId(mtgId);
+
       // Save meeting record
       addMeeting({
+        id: mtgId,
         title: meetingTitle,
         platform,
         transcriptText: transcript,
@@ -105,19 +118,24 @@ export default function UploadPage() {
 
   const handleImport = () => {
     const toImport = editedItems.filter((_, i) => !removedIds.has(i));
-    const mtgId = `m-${Date.now()}`;
+    const mtgId = currentMeetingId || crypto.randomUUID();
     importCommitments(toImport, mtgId, meetingTitle);
     setState('idle');
     setTranscript('');
     setExtracted([]);
     setEditedItems([]);
     setMeetingTitle('');
+    setCurrentMeetingId(null);
   };
 
   const toggleRemove = (i: number) => {
     setRemovedIds(prev => {
       const s = new Set(prev);
-      s.has(i) ? s.delete(i) : s.add(i);
+      if (s.has(i)) {
+        s.delete(i);
+      } else {
+        s.add(i);
+      }
       return s;
     });
   };
@@ -362,7 +380,7 @@ export default function UploadPage() {
                           </span>
                         </div>
                         <span style={{ fontSize: '0.68rem', color: '#4a5a7a', fontStyle: 'italic', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          "{item.rawText.slice(0, 50)}..."
+                          &ldquo;{item.rawText.slice(0, 50)}...&rdquo;
                         </span>
                       </div>
 
@@ -427,7 +445,7 @@ export default function UploadPage() {
               <div style={{ fontSize: '2rem', marginBottom: 12 }}>🔍</div>
               <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 600, marginBottom: 8 }}>No commitments found</h3>
               <p style={{ color: '#8899bb', fontSize: '0.85rem', marginBottom: 16 }}>
-                The AI couldn't detect commitment patterns. Try a transcript with phrases like "I'll", "I will", "we'll complete"...
+                {"The AI couldn't detect commitment patterns. Try a transcript with phrases like \"I'll\", \"I will\", \"we'll complete\"..."}
               </p>
               <button className="btn-secondary" onClick={() => { setState('idle'); setExtracted([]); }}>
                 Try Another Transcript

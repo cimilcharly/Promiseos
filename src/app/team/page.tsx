@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember } from '@/lib/types';
-import { TrendingUp, TrendingDown, Award, AlertTriangle, CheckCircle2, Clock, ChevronDown, ChevronUp, Mail } from 'lucide-react';
+import { TrendingUp, TrendingDown, Award, AlertTriangle, CheckCircle2, Clock, ChevronDown, ChevronUp, Mail, Plus, X, Loader2, ArrowRight } from 'lucide-react';
 import { RadialBarChart, RadialBar, ResponsiveContainer, PolarAngleAxis } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -205,8 +205,40 @@ function MemberCard({ member, commitments, onRemind }: {
 }
 
 export default function TeamPage() {
-  const { members, commitments, sendSimulatedReminder, stats } = useApp();
+  const { members, commitments, sendSimulatedReminder, stats, showToast } = useApp();
   const [sort, setSort] = useState<'score' | 'name' | 'overdue'>('score');
+  
+  // Invitation states
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('member');
+  const [inviteLoading, setInviteLoading] = useState(false);
+
+  const handleInviteSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
+    setInviteLoading(true);
+    try {
+      const res = await fetch('/api/invite/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to send invite');
+      }
+      showToast(`📧 Invitation sent to ${inviteEmail}!`, 'success');
+      setInviteEmail('');
+      setShowInviteModal(false);
+    } catch (err: any) {
+      showToast(err.message || 'Invitation failed', 'error');
+    } finally {
+      setInviteLoading(false);
+    }
+  };
 
   const sorted = [...members].sort((a, b) => {
     if (sort === 'score') return b.reliabilityScore - a.reliabilityScore;
@@ -214,8 +246,12 @@ export default function TeamPage() {
     return b.overdue - a.overdue;
   });
 
-  const topPerformer = [...members].sort((a, b) => b.reliabilityScore - a.reliabilityScore)[0];
-  const mostRisk = [...members].sort((a, b) => b.overdue - a.overdue)[0];
+  const topPerformer = members.length > 0
+    ? [...members].sort((a, b) => b.reliabilityScore - a.reliabilityScore)[0]
+    : null;
+  const mostRisk = members.length > 0
+    ? [...members].sort((a, b) => b.overdue - a.overdue)[0]
+    : null;
 
   return (
     <div>
@@ -236,7 +272,14 @@ export default function TeamPage() {
               {members.length} members · {stats.reliabilityAvg}% average reliability
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={() => setShowInviteModal(true)}
+              className="btn-primary"
+              style={{ padding: '6px 14px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}
+            >
+              <Plus size={12} /> Invite Member
+            </button>
             {(['score', 'name', 'overdue'] as const).map(s => (
               <button key={s} onClick={() => setSort(s)}
                 style={{
@@ -276,10 +319,10 @@ export default function TeamPage() {
               <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Top Performer</span>
             </div>
             <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: '#f0f6ff', marginBottom: 2 }}>
-              {topPerformer.name}
+              {topPerformer ? topPerformer.name : 'N/A'}
             </div>
             <div style={{ fontSize: '0.8rem', color: '#8899bb' }}>
-              {topPerformer.reliabilityScore}% reliability · {topPerformer.role}
+              {topPerformer ? `${topPerformer.reliabilityScore}% reliability · ${topPerformer.role}` : 'No data loaded'}
             </div>
           </motion.div>
 
@@ -296,10 +339,10 @@ export default function TeamPage() {
               <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f43f5e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Needs Attention</span>
             </div>
             <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: '#f0f6ff', marginBottom: 2 }}>
-              {mostRisk.name}
+              {mostRisk ? mostRisk.name : 'N/A'}
             </div>
             <div style={{ fontSize: '0.8rem', color: '#8899bb' }}>
-              {mostRisk.overdue} overdue · {mostRisk.reliabilityScore}% reliability
+              {mostRisk ? `${mostRisk.overdue} overdue · ${mostRisk.reliabilityScore}% reliability` : 'No data loaded'}
             </div>
           </motion.div>
 
@@ -333,6 +376,56 @@ export default function TeamPage() {
             ))}
           </AnimatePresence>
         </motion.div>
+
+        {/* Invite Modal */}
+        <AnimatePresence>
+          {showInviteModal && (
+            <div style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+            }} onClick={() => setShowInviteModal(false)}>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.9, y: 15 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.9, y: 15 }}
+                transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+                className="glass-card"
+                style={{ width: '100%', maxWidth: 400, padding: 32, margin: 16 }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+                  <h2 style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 700, fontSize: '1.2rem' }}>Invite Team Member</h2>
+                  <button onClick={() => setShowInviteModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a5a7a' }}>
+                    <X size={18} />
+                  </button>
+                </div>
+                <form onSubmit={handleInviteSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#8899bb', display: 'block', marginBottom: 6 }}>Email Address *</label>
+                    <input
+                      type="email"
+                      required
+                      className="input-field"
+                      placeholder="colleague@company.com"
+                      value={inviteEmail}
+                      onChange={e => setInviteEmail(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: '#8899bb', display: 'block', marginBottom: 6 }}>Role</label>
+                    <select className="input-field" value={inviteRole} onChange={e => setInviteRole(e.target.value)}>
+                      <option value="member">Member</option>
+                      <option value="admin">Administrator</option>
+                    </select>
+                  </div>
+                  <button className="btn-primary" type="submit" disabled={inviteLoading} style={{ width: '100%', padding: 12, marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                    {inviteLoading ? <Loader2 size={14} className="animate-spin" /> : <>Send Invitation <ArrowRight size={14} /></>}
+                  </button>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
       </main>
     </div>
   );
