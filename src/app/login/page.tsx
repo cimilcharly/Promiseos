@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [orgName, setOrgName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +42,9 @@ export default function LoginPage() {
         const inviteToken = sessionStorage.getItem('promiseos_invite_token') || new URLSearchParams(window.location.search).get('invite_token');
         let signUpOptions: any = {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
+          data: {
+            org_name: orgName,
+          },
         };
 
         if (inviteToken) {
@@ -53,6 +57,7 @@ export default function LoginPage() {
 
           if (invite) {
             signUpOptions.data = {
+              ...signUpOptions.data,
               org_id: invite.org_id,
               role: invite.role
             };
@@ -65,7 +70,7 @@ export default function LoginPage() {
           options: signUpOptions,
         });
         if (error) throw error;
-        
+
         if (inviteToken) {
           showToast('Registration successful! Use the sign in form to complete invitation accept.', 'success');
         } else {
@@ -191,6 +196,22 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {!isLogin && (
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#8899bb', marginBottom: 6 }}>Organization Name</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  type="text"
+                  required={!isLogin}
+                  className="input-field"
+                  placeholder="Apex Digital Agency"
+                  value={orgName}
+                  onChange={e => setOrgName(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+
           <div>
             <label style={{ display: 'block', fontSize: '0.8rem', color: '#8899bb', marginBottom: 6 }}>Email</label>
             <div style={{ position: 'relative' }}>
@@ -241,7 +262,7 @@ export default function LoginPage() {
         <div style={{ marginTop: 24, textAlign: 'center', fontSize: '0.85rem', color: '#8899bb' }}>
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <button
-            onClick={() => { setIsLogin(!isLogin); setError(null); }}
+            onClick={() => { setIsLogin(!isLogin); setError(null); setEmail(''); setPassword(''); setOrgName(''); }}
             style={{ background: 'none', border: 'none', color: '#00d4ff', fontWeight: 600, cursor: 'pointer' }}
           >
             {isLogin ? 'Sign up' : 'Log in'}
