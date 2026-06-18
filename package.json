@@ -9,10 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.21.0",
     "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.2",
     "firebase": "^12.14.0",
+    "googleapis": "^118.0.0",
     "lucide-react": "^1.18.0",
     "motion": "^12.40.0",
     "next": "16.2.9",
