@@ -99,118 +99,42 @@ alter table public.meetings enable row level security;
 alter table public.commitments enable row level security;
 alter table public.notification_logs enable row level security;
 
--- ── 3. RLS Policies ──
+-- ── 3. Security Definer Function (prevents RLS recursion on profiles) ──
 
--- Organizations: users can read their own organization details
-create policy "Users can view their organization"
-on public.organizations
-for select
-using (
-    id = (select org_id from public.profiles where id = auth.uid())
-);
+create or replace function public.get_my_org_id()
+returns uuid
+language sql
+security definer
+stable
+as $$
+  select org_id from public.profiles where id = auth.uid() limit 1;
+$$;
 
-create policy "Admins can update their organization"
-on public.organizations
-for update
-using (
-    id = (select org_id from public.profiles where id = auth.uid() and role = 'admin')
-);
+-- ── 4. RLS Policies ──
 
--- Profiles: users can read any profile in their organization and update their own
-create policy "Users can view profiles in their organization"
-on public.profiles
-for select
-using (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
+-- Organizations
+create policy "org_view" on public.organizations for all
+  using (id = public.get_my_org_id());
 
-create policy "Users can update their own profile"
-on public.profiles
-for update
-using (
-    id = auth.uid()
-);
+-- Profiles (uses auth.uid() directly to avoid recursion)
+create policy "profile_view" on public.profiles for all
+  using (org_id = public.get_my_org_id() or id = auth.uid());
 
--- Invitations: visible to organization members
-create policy "Users can view invitations for their organization"
-on public.invitations
-for select
-using (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
+-- Invitations
+create policy "invitation_view" on public.invitations for all
+  using (org_id = public.get_my_org_id());
 
-create policy "Admins can create invitations"
-on public.invitations
-for insert
-with check (
-    org_id = (select org_id from public.profiles where id = auth.uid() and role = 'admin')
-);
+-- Meetings
+create policy "meeting_view" on public.meetings for all
+  using (org_id = public.get_my_org_id());
 
-create policy "Admins can update invitations"
-on public.invitations
-for update
-using (
-    org_id = (select org_id from public.profiles where id = auth.uid() and role = 'admin')
-);
+-- Commitments
+create policy "commitment_view" on public.commitments for all
+  using (org_id = public.get_my_org_id());
 
--- Meetings: tenant-isolated
-create policy "Users can view meetings in their organization"
-on public.meetings
-for select
-using (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
-
-create policy "Users can create meetings in their organization"
-on public.meetings
-for insert
-with check (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
-
-create policy "Users can update/delete meetings in their organization"
-on public.meetings
-for all
-using (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
-
--- Commitments: tenant-isolated
-create policy "Users can view commitments in their organization"
-on public.commitments
-for select
-using (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
-
-create policy "Users can create commitments in their organization"
-on public.commitments
-for insert
-with check (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
-
-create policy "Users can update/delete commitments in their organization"
-on public.commitments
-for all
-using (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
-
--- Notification Logs: tenant-isolated
-create policy "Users can view notification logs in their organization"
-on public.notification_logs
-for select
-using (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
-
-create policy "Users can create notification logs in their organization"
-on public.notification_logs
-for insert
-with check (
-    org_id = (select org_id from public.profiles where id = auth.uid())
-);
+-- Notification Logs
+create policy "notification_view" on public.notification_logs for all
+  using (org_id = public.get_my_org_id());
 
 -- ── 4. Setup User Registration Trigger ──
 
