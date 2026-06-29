@@ -26,7 +26,40 @@ export async function getMyOrgId(): Promise<string> {
     .single();
 
   if (error || !profile) {
-    throw new Error('No organization found for the current profile');
+    try {
+      console.log('Profile/Org not found. Running database healing...');
+      const orgName = `${user.user_metadata?.full_name || user.email?.split('@')[0] || 'My'}'s Workspace`;
+      
+      const { data: orgData, error: orgErr } = await supabase
+        .from('organizations')
+        .insert([{ name: orgName, plan: 'starter', industry: 'Technology' }])
+        .select('id')
+        .single();
+      
+      if (orgErr || !orgData) {
+        throw new Error(`Failed to create fallback organization: ${orgErr?.message}`);
+      }
+
+      const { error: profileErr } = await supabase
+        .from('profiles')
+        .insert([{
+          id: user.id,
+          org_id: orgData.id,
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'User',
+          email: user.email!,
+          role: 'admin'
+        }]);
+
+      if (profileErr) {
+        throw new Error(`Failed to create fallback profile: ${profileErr.message}`);
+      }
+
+      console.log('Database healing completed successfully.');
+      return orgData.id;
+    } catch (healError) {
+      console.warn('Database healing failed:', healError);
+      throw new Error('No organization found for the current profile');
+    }
   }
 
   return profile.org_id;
@@ -325,7 +358,7 @@ export async function getOrganizationDb(): Promise<Organization | null> {
 
     return mapDbOrgToTs(org, count || 1);
   } catch (error) {
-    console.error('Error fetching organization from Supabase:', error);
+    console.warn('Error fetching organization from Supabase:', error);
     return null;
   }
 }
