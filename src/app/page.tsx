@@ -26,6 +26,7 @@ export default function LandingPage() {
   const router = useRouter();
   const { showToast } = useApp();
   const handleEnterDemo = () => {
+    document.cookie = "promiseos_demo_mode=true; path=/; max-age=86400; SameSite=Lax";
     showToast('👋 Welcome to PromiseOS Demo — Apex Digital Agency loaded!', 'success');
     router.push('/dashboard');
   };

@@ -389,6 +389,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [supabase.auth]);
 
   const signOut = async () => {
+    document.cookie = "promiseos_demo_mode=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
     await supabase.auth.signOut();
     setUser(null);
     showToast('Signed out successfully', 'info');
