@@ -276,11 +276,7 @@ export default function DashboardPage() {
     
     const confidence = (categoryConf + taskConf + deadlineConf + financialConf + trackingConf) / 5;
     
-    if (confidence < 0.7) return false;
-    if (confidence >= 0.7 && confidence < 0.9 && !feedback) {
-      suggestedInsights.push(email);
-      return false;
-    }
+    if (confidence < 0.5) return false;
     return true;
   });
 
@@ -797,7 +793,7 @@ export default function DashboardPage() {
 
           {/* Dynamic Intelligence Section */}
           {/* 4. Opportunity Center */}
-          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, minHeight: 220 }}>
+          <div className="glass-card" style={{ gridColumn: 'span 3', padding: 20, minHeight: 220 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Award size={16} color="#3b82f6" /> Opportunity Center
             </h3>
@@ -807,7 +803,14 @@ export default function DashboardPage() {
                   <div key={idx} onClick={() => setSelectedItem(op)} style={{
                     padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, cursor: 'pointer'
                   }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff' }}>{op.subject}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {op.subject}
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); handleFeedback(op.id, 'rejected'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a5a7a', padding: 2 }}>
+                        <X size={11} />
+                      </button>
+                    </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                       {op.insights.dynamic_tags?.map((tag, i) => (
                         <span key={i} style={{ fontSize: '0.62rem', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '2px 6px', borderRadius: 4 }}>
@@ -828,7 +831,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 5. Security Center */}
-          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, minHeight: 220 }}>
+          <div className="glass-card" style={{ gridColumn: 'span 3', padding: 20, minHeight: 220 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <ShieldCheck size={16} color="#ef4444" /> Security Alerts
             </h3>
@@ -838,8 +841,15 @@ export default function DashboardPage() {
                   <div key={idx} onClick={() => setSelectedItem(sec)} style={{
                     padding: 12, background: 'rgba(239,68,68,0.02)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: 10, cursor: 'pointer'
                   }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#ef4444' }}>{sec.subject}</div>
-                    <p style={{ fontSize: '0.7rem', color: '#8899bb', marginTop: 4 }}>{sec.snippet}</p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#ef4444', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {sec.subject}
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); handleFeedback(sec.id, 'rejected'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a5a7a', padding: 2 }}>
+                        <X size={11} />
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.7rem', color: '#8899bb', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sec.snippet}</p>
                     <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
                       <span>Score: {sec.insights.importance || 80}%</span>
                       <span>{new Date(sec.dateSent).toLocaleDateString()}</span>
@@ -853,7 +863,7 @@ export default function DashboardPage() {
           </div>
 
           {/* 6. Updates Feed */}
-          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, minHeight: 220 }}>
+          <div className="glass-card" style={{ gridColumn: 'span 3', padding: 20, minHeight: 220 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Newspaper size={16} color="#10b981" /> Updates Feed
             </h3>
@@ -863,7 +873,14 @@ export default function DashboardPage() {
                   <div key={idx} onClick={() => setSelectedItem(upd)} style={{
                     padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, cursor: 'pointer'
                   }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff' }}>{upd.subject}</div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {upd.subject}
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); handleFeedback(upd.id, 'rejected'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a5a7a', padding: 2 }}>
+                        <X size={11} />
+                      </button>
+                    </div>
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
                       {upd.insights.dynamic_tags?.map((tag, i) => (
                         <span key={i} style={{ fontSize: '0.62rem', background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '2px 6px', borderRadius: 4 }}>
@@ -879,6 +896,38 @@ export default function DashboardPage() {
                 ))
               ) : (
                 <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>No updates logged.</div>
+              )}
+            </div>
+          </div>
+
+          {/* 7. Personal Insights Panel */}
+          <div className="glass-card" style={{ gridColumn: 'span 3', padding: 20, minHeight: 220 }}>
+            <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <UserIcon size={16} color="#f59e0b" /> Personal Insights
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {confirmedPersonalInsights.length > 0 ? (
+                confirmedPersonalInsights.map((pers, idx) => (
+                  <div key={idx} onClick={() => setSelectedItem(pers)} style={{
+                    padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, cursor: 'pointer'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                        {pers.subject}
+                      </div>
+                      <button onClick={(e) => { e.stopPropagation(); handleFeedback(pers.id, 'rejected'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a5a7a', padding: 2 }}>
+                        <X size={11} />
+                      </button>
+                    </div>
+                    <p style={{ fontSize: '0.7rem', color: '#8899bb', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pers.snippet}</p>
+                    <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Importance: {pers.insights.importance || 50}%</span>
+                      <span>{new Date(pers.dateSent).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>No personal updates.</div>
               )}
             </div>
           </div>
