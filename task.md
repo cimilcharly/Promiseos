@@ -1,5 +1,4 @@
-# Task List: Personal Memory Vault RAG Chatbot
+# Task List: Agentic Tool Use (Function Calling)
 
-- `[ ]` Refactor: Create memory query API handler (`src/app/api/chat/route.ts`)
-- `[ ]` Refactor: Update Dashboard Assistant form to submit to `/api/chat` (`src/app/dashboard/page.tsx`)
+- `[ ]` Refactor: Implement Gemini tools and execution loop in chat API (`src/app/api/chat/route.ts`)
 - `[ ]` Verification: Verify Next.js production compilation (`npm run build`)

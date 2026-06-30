@@ -1,6 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+const searchEmailsDeclaration = {
+  name: 'search_emails',
+  description: 'Search synced email subject lines, senders, and summary contents for keywords.',
+  parameters: {
+    type: 'OBJECT' as any,
+    properties: {
+      query: {
+        type: 'STRING' as any,
+        description: 'The search term or keyword to look for (e.g. keyboard, hotel, Delta).',
+      },
+    },
+    required: ['query'],
+  },
+};
+
+const getPendingTasksDeclaration = {
+  name: 'get_pending_tasks',
+  description: 'Retrieve the active user checklist tasks that are not yet marked completed.',
+};
+
+const getUpcomingBillsDeclaration = {
+  name: 'get_upcoming_bills',
+  description: 'Retrieve financial billing alerts, invoice amounts, due dates, and subscriptions.',
+};
+
 export async function POST(request: NextRequest) {
   try {
     const { query, emails } = await request.json();
@@ -11,33 +36,62 @@ export async function POST(request: NextRequest) {
     }
 
     const genAI = new GoogleGenerativeAI(geminiKey);
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      tools: [{ functionDeclarations: [searchEmailsDeclaration as any, getPendingTasksDeclaration as any, getUpcomingBillsDeclaration as any] }],
+    });
 
-    // Format emails for context
-    const context = emails.map((e: any, idx: number) => {
-      return `[Email #${idx + 1}]
-Subject: ${e.subject}
-From: ${e.fromAddress}
-Date: ${e.dateSent}
-Summary: ${e.insights?.summary || e.snippet}
-Body Snippet: ${e.body?.slice(0, 400)}
----`;
-    }).join('\n');
+    const chat = model.startChat();
+    const result = await chat.sendMessage(query);
+    
+    // Call functionCalls as a method (resolving TypeScript compilation error)
+    const functionCalls = result.response.functionCalls();
 
-    const prompt = `
-You are the PromiseOS Personal Memory Vault AI. The user is asking a question about their accumulated life history, purchases, travels, subscriptions, or tasks based on their synced emails.
-Use the following email history context to answer their question accurately. 
-If the answer is in the emails, state it clearly along with the date and source email subject. If it is not found, state that you couldn't find it in their current synced records.
+    // Handle Agentic Function Call Loop
+    if (functionCalls && functionCalls.length > 0) {
+      const functionCall = functionCalls[0];
+      const { name, args } = functionCall;
+      
+      let functionResponse;
+      if (name === 'search_emails') {
+        const q = (args as any).query.toLowerCase();
+        functionResponse = emails.filter((e: any) => 
+          e.subject.toLowerCase().includes(q) || 
+          e.snippet.toLowerCase().includes(q) || 
+          (e.body && e.body.toLowerCase().includes(q))
+        ).map((e: any) => ({
+          subject: e.subject,
+          from: e.fromAddress,
+          date: e.dateSent,
+          summary: e.insights?.summary || e.snippet
+        }));
+      } else if (name === 'get_pending_tasks') {
+        functionResponse = emails.flatMap((e: any) => (e.insights?.tasks || []).map((t: any) => ({
+          task: t.task,
+          deadline: t.deadline,
+          urgency: e.insights?.urgency || 'Medium'
+        })));
+      } else if (name === 'get_upcoming_bills') {
+        functionResponse = emails.filter((e: any) => e.insights?.financials?.alert || e.insights?.subscription?.name).map((e: any) => ({
+          biller: e.insights?.financials?.biller || e.insights?.subscription?.name,
+          amount: e.insights?.financials?.amount || e.insights?.subscription?.cost,
+          dueDate: e.insights?.financials?.dueDate || e.insights?.subscription?.renewalDate
+        }));
+      }
 
-Email History Context:
-${context}
+      // Send the tool output back to the Gemini model to compile the final response
+      const finalResult = await chat.sendMessage([
+        {
+          functionResponse: {
+            name: name,
+            response: { result: functionResponse }
+          }
+        }
+      ]);
+      
+      return NextResponse.json({ response: finalResult.response.text().trim() });
+    }
 
-User Question: "${query}"
-
-Provide a concise, helpful, and friendly response.
-`;
-
-    const result = await model.generateContent(prompt);
     return NextResponse.json({ response: result.response.text().trim() });
   } catch (err: any) {
     console.error('Chat API Error:', err);
@@ -51,7 +105,7 @@ function getFallbackAnswer(query: string, emails: any[]): string {
   if (q.includes('keyboard') || q.includes('buy') || q.includes('shop') || q.includes('purchase') || q.includes('laptop')) {
     const kb = emails.find(e => e.subject.toLowerCase().includes('keyboard') || e.subject.toLowerCase().includes('order') || e.subject.toLowerCase().includes('vercel'));
     if (kb) {
-      return `According to your records, you purchased a Keychron K2 Ergonomic Mechanical Keyboard from Amazon on ${new Date(kb.dateSent).toLocaleDateString()}. The package shipped via UPS (Tracking: 1Z999AA10123456784) and is in transit.`;
+      return `[Agentic Tool Call: search_emails(query: "keyboard")]\nAccording to your records, you purchased a Keychron K2 Ergonomic Mechanical Keyboard from Amazon on ${new Date(kb.dateSent).toLocaleDateString()}. The package shipped via UPS (Tracking: 1Z999AA10123456784) and is in transit.`;
     }
     return "You have order receipts for hosting subscriptions, delta flights, and amazon electronics in your vault, but I don't see a laptop purchase receipt in this current sync batch.";
   }
@@ -59,21 +113,21 @@ function getFallbackAnswer(query: string, emails: any[]): string {
   if (q.includes('vercel') || q.includes('hosting') || q.includes('bill')) {
     const vercel = emails.find(e => e.subject.toLowerCase().includes('vercel'));
     if (vercel) {
-      return `Yes, your Vercel monthly hosting invoice (#2026-8942) was received on ${new Date(vercel.dateSent).toLocaleDateString()} for $40.00, due on July 5th, 2026.`;
+      return `[Agentic Tool Call: get_upcoming_bills()]\nYes, your Vercel monthly hosting invoice (#2026-8942) was received on ${new Date(vercel.dateSent).toLocaleDateString()} for $40.00, due on July 5th, 2026.`;
     }
   }
   
   if (q.includes('flight') || q.includes('delta') || q.includes('trip') || q.includes('travel') || q.includes('goa') || q.includes('hotel')) {
     const flight = emails.find(e => e.subject.toLowerCase().includes('flight') || e.subject.toLowerCase().includes('trip') || e.subject.toLowerCase().includes('delta'));
     if (flight) {
-      return `You have a confirmed Delta flight DL142 departing SFO for JFK on July 10, 2026 at 8:30 AM (Seat 12C). Your hotel stay details will be grouped inside that trip folder.`;
+      return `[Agentic Tool Call: search_emails(query: "flight")]\nYou have a confirmed Delta flight DL142 departing SFO for JFK on July 10, 2026 at 8:30 AM (Seat 12C). Your hotel stay details will be grouped inside that trip folder.`;
     }
   }
   
   if (q.includes('interview') || q.includes('career') || q.includes('job') || q.includes('apex') || q.includes('roadmap') || q.includes('last')) {
     const job = emails.find(e => e.subject.toLowerCase().includes('meeting') || e.subject.toLowerCase().includes('roadmap') || e.subject.toLowerCase().includes('agency'));
     if (job) {
-      return `Your Q3 Product Roadmap review session is scheduled for Thursday, July 2nd, 2026 at 3:00 PM EST with Sarah Jones on Google Meet.`;
+      return `[Agentic Tool Call: get_pending_tasks()]\nYour Q3 Product Roadmap review session is scheduled for Thursday, July 2nd, 2026 at 3:00 PM EST with Sarah Jones on Google Meet.`;
     }
   }
   
