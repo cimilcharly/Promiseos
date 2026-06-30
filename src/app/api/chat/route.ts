@@ -28,11 +28,16 @@ const getUpcomingBillsDeclaration = {
 
 export async function POST(request: NextRequest) {
   try {
-    const { query, emails } = await request.json();
+    const { query, emails, persona } = await request.json();
     const geminiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
+    const personaInstructions = 
+      persona === 'The Motivator' ? 'You are extremely enthusiastic, positive, and progress-oriented. Emphasize task completion!' :
+      persona === 'The Auditor' ? 'You are extremely analytical, formal, risk-conscious, and precise. Focus on dates, invoices, and accuracy.' :
+      'You are brief, professional, minimalist, and action-focused.';
+
     if (!geminiKey || geminiKey === 'mock-key') {
-      return NextResponse.json({ response: getFallbackAnswer(query, emails) });
+      return NextResponse.json({ response: getFallbackAnswer(query, emails, persona) });
     }
 
     const genAI = new GoogleGenerativeAI(geminiKey);
@@ -42,9 +47,10 @@ export async function POST(request: NextRequest) {
     });
 
     const chat = model.startChat();
-    const result = await chat.sendMessage(query);
     
-    // Call functionCalls as a method (resolving TypeScript compilation error)
+    // Inject persona instruction inside the query message wrapper
+    const wrappedMessage = `${query}\n\n[System Assistant Persona instruction: ${personaInstructions}]`;
+    const result = await chat.sendMessage(wrappedMessage);
     const functionCalls = result.response.functionCalls();
 
     // Handle Agentic Function Call Loop
@@ -99,37 +105,38 @@ export async function POST(request: NextRequest) {
   }
 }
 
-function getFallbackAnswer(query: string, emails: any[]): string {
+function getFallbackAnswer(query: string, emails: any[], persona?: string): string {
   const q = query.toLowerCase();
+  const personaHeader = persona ? `[Persona Mode: ${persona}] ` : '';
   
   if (q.includes('keyboard') || q.includes('buy') || q.includes('shop') || q.includes('purchase') || q.includes('laptop')) {
     const kb = emails.find(e => e.subject.toLowerCase().includes('keyboard') || e.subject.toLowerCase().includes('order') || e.subject.toLowerCase().includes('vercel'));
     if (kb) {
-      return `[Agentic Tool Call: search_emails(query: "keyboard")]\nAccording to your records, you purchased a Keychron K2 Ergonomic Mechanical Keyboard from Amazon on ${new Date(kb.dateSent).toLocaleDateString()}. The package shipped via UPS (Tracking: 1Z999AA10123456784) and is in transit.`;
+      return `${personaHeader}[Agentic Tool Call: search_emails(query: "keyboard")]\nAccording to your records, you purchased a Keychron K2 Ergonomic Mechanical Keyboard from Amazon on ${new Date(kb.dateSent).toLocaleDateString()}. The package shipped via UPS (Tracking: 1Z999AA10123456784) and is in transit.`;
     }
-    return "You have order receipts for hosting subscriptions, delta flights, and amazon electronics in your vault, but I don't see a laptop purchase receipt in this current sync batch.";
+    return `${personaHeader}You have order receipts for hosting subscriptions, delta flights, and amazon electronics in your vault, but I don't see a laptop purchase receipt in this current sync batch.`;
   }
   
   if (q.includes('vercel') || q.includes('hosting') || q.includes('bill')) {
     const vercel = emails.find(e => e.subject.toLowerCase().includes('vercel'));
     if (vercel) {
-      return `[Agentic Tool Call: get_upcoming_bills()]\nYes, your Vercel monthly hosting invoice (#2026-8942) was received on ${new Date(vercel.dateSent).toLocaleDateString()} for $40.00, due on July 5th, 2026.`;
+      return `${personaHeader}[Agentic Tool Call: get_upcoming_bills()]\nYes, your Vercel monthly hosting invoice (#2026-8942) was received on ${new Date(vercel.dateSent).toLocaleDateString()} for $40.00, due on July 5th, 2026.`;
     }
   }
   
   if (q.includes('flight') || q.includes('delta') || q.includes('trip') || q.includes('travel') || q.includes('goa') || q.includes('hotel')) {
     const flight = emails.find(e => e.subject.toLowerCase().includes('flight') || e.subject.toLowerCase().includes('trip') || e.subject.toLowerCase().includes('delta'));
     if (flight) {
-      return `[Agentic Tool Call: search_emails(query: "flight")]\nYou have a confirmed Delta flight DL142 departing SFO for JFK on July 10, 2026 at 8:30 AM (Seat 12C). Your hotel stay details will be grouped inside that trip folder.`;
+      return `${personaHeader}[Agentic Tool Call: search_emails(query: "flight")]\nYou have a confirmed Delta flight DL142 departing SFO for JFK on July 10, 2026 at 8:30 AM (Seat 12C). Your hotel stay details will be grouped inside that trip folder.`;
     }
   }
   
   if (q.includes('interview') || q.includes('career') || q.includes('job') || q.includes('apex') || q.includes('roadmap') || q.includes('last')) {
     const job = emails.find(e => e.subject.toLowerCase().includes('meeting') || e.subject.toLowerCase().includes('roadmap') || e.subject.toLowerCase().includes('agency'));
     if (job) {
-      return `[Agentic Tool Call: get_pending_tasks()]\nYour Q3 Product Roadmap review session is scheduled for Thursday, July 2nd, 2026 at 3:00 PM EST with Sarah Jones on Google Meet.`;
+      return `${personaHeader}[Agentic Tool Call: get_pending_tasks()]\nYour Q3 Product Roadmap review session is scheduled for Thursday, July 2nd, 2026 at 3:00 PM EST with Sarah Jones on Google Meet.`;
     }
   }
   
-  return "I searched your synced memory vault but couldn't find specific matches. Could you try rephrasing or syncing more emails?";
+  return `${personaHeader}I searched your synced memory vault but couldn't find specific matches. Could you try rephrasing or syncing more emails?`;
 }

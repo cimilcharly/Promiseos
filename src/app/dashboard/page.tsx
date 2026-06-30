@@ -9,7 +9,7 @@ import {
   Truck, Search, RefreshCw, AlertTriangle, CheckCircle,
   Eye, Clock, Sparkles, Filter, Trash2, ArrowUpRight,
   Send, Bot, User as UserIcon, Plus, X, BarChart3, TrendingUp,
-  ThumbsUp, ThumbsDown, Luggage, Layers, Video, PlusCircle
+  ThumbsUp, ThumbsDown, Luggage, Layers, Video, PlusCircle, Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MockEmail } from '@/lib/mock_emails';
@@ -54,6 +54,13 @@ export default function DashboardPage() {
   const [emails, setEmails] = useState<MockEmail[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   
+  // Novel Feature 4: Interactive Command Persona State
+  const [persona, setPersona] = useState<'Executive Minimalist' | 'The Motivator' | 'The Auditor'>('Executive Minimalist');
+
+  // Novel Feature 1: One-Click Reply Draft State
+  const [draftText, setDraftText] = useState('');
+  const [draftLoading, setDraftLoading] = useState(false);
+
   // Interactive States
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [completedTasks, setCompletedTasks] = useState<Record<string, boolean>>({});
@@ -76,6 +83,9 @@ export default function DashboardPage() {
 
     const storedFeedback = localStorage.getItem('promiseos_user_feedback');
     if (storedFeedback) setFeedbacks(JSON.parse(storedFeedback));
+
+    const storedPersona = localStorage.getItem('promiseos_active_persona');
+    if (storedPersona) setPersona(storedPersona as any);
   }, []);
 
   const handleAcceptConsents = (newConsents: any) => {
@@ -134,7 +144,7 @@ export default function DashboardPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Chat Submission Handler (resolving Issue 9 - Personal Memory Vault RAG operations)
+  // Chat Submission Handler (transmits Persona style context)
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -150,7 +160,8 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           query: userText,
-          emails, // Feed full context to RAG model
+          emails, 
+          persona, // Pass selected persona style
         }),
       });
 
@@ -162,9 +173,40 @@ export default function DashboardPage() {
       }
     } catch (err) {
       console.error(err);
-      setChatMessages(prev => [...prev, { sender: 'bot', text: 'Failed to access Memory Vault. Fallback system offline.' }]);
+      setChatMessages(prev => [...prev, { sender: 'bot', text: 'Failed to access Memory Vault.' }]);
     } finally {
       setChatLoading(false);
+    }
+  };
+
+  // Feature 1: One-Click AI Reply Draft handler
+  const handleGenerateDraft = async (subject: string, body: string, isCompleted: boolean) => {
+    setDraftLoading(true);
+    setDraftText('');
+    try {
+      const response = await fetch('/api/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject,
+          body,
+          taskStatus: isCompleted ? 'completed' : 'pending',
+          persona
+        })
+      });
+
+      const data = await response.json();
+      if (data.draft) {
+        setDraftText(data.draft);
+        showToast('✉️ AI Response Draft generated!', 'success');
+      } else {
+        throw new Error(data.error || 'Draft generation failed');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('⚠️ Could not generate draft.', 'error');
+    } finally {
+      setDraftLoading(false);
     }
   };
 
@@ -321,10 +363,33 @@ export default function DashboardPage() {
   // Google Calendar URL Generator Helper
   const getGoogleCalendarLink = (title: string, date: string, time: string, joinLink?: string) => {
     const cleanDate = date.replace(/-/g, '');
-    const startDateTime = `${cleanDate}T090000Z`; // Default to 9 AM
+    const startDateTime = `${cleanDate}T090000Z`;
     const endDateTime = `${cleanDate}T100000Z`;
     const details = `Extracted automatically by PromiseOS.\nJoin Link: ${joinLink || 'Online'}`;
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDateTime}/${endDateTime}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(joinLink || 'Online')}`;
+  };
+
+  // Novel Feature 4: Persona-driven Hero Brief Text
+  const getHeroBriefingText = () => {
+    const tasksCount = filteredTasks.length;
+    const deadlinesCount = filteredDeadlines.length;
+    const trackingCount = filteredTrackings.length;
+
+    if (persona === 'The Motivator') {
+      return `Let's crush it today, Charlie! 🚀 You have got ${tasksCount} action goals to conquer, ${deadlinesCount} deadlines to hit, and ${trackingCount} active delivery updates in transit. Let's make it happen!`;
+    }
+    if (persona === 'The Auditor') {
+      return `System Status Audit: Reconciled ${emails.length} data streams. Found ${tasksCount} pending task risks requiring attention, ${deadlinesCount} upcoming deadlines, and ${trackingCount} courier cargo items. Financial indicators are verified.`;
+    }
+    // Default: Executive Minimalist
+    return `Charlie, you have ${tasksCount} pending tasks, ${deadlinesCount} deadlines this week, and ${trackingCount} package delivery arriving soon.`;
+  };
+
+  // Persona Dropdown Change Handler
+  const handlePersonaChange = (val: typeof persona) => {
+    setPersona(val);
+    localStorage.setItem('promiseos_active_persona', val);
+    showToast(`🎭 Persona updated to ${val}`, 'info');
   };
 
   // Analytics Chart Data
@@ -364,6 +429,24 @@ export default function DashboardPage() {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            {/* Novel Feature 4: Dynamic Persona Selection */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: '0.72rem', color: '#8899bb' }}>AI Persona:</span>
+              <select
+                value={persona}
+                onChange={e => handlePersonaChange(e.target.value as any)}
+                style={{
+                  background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 10, padding: '6px 12px', fontSize: '0.78rem', color: '#f0f6ff',
+                  outline: 'none', cursor: 'pointer'
+                }}
+              >
+                <option value="Executive Minimalist" style={{ background: '#0d1424' }}>Executive Minimalist</option>
+                <option value="The Motivator" style={{ background: '#0d1424' }}>The Motivator (Upbeat)</option>
+                <option value="The Auditor" style={{ background: '#0d1424' }}>The Auditor (Formal)</option>
+              </select>
+            </div>
+
             <button
               onClick={() => {
                 setChatMessages(prev => [...prev, { sender: 'bot', text: 'How can I assist you with your dashboard items?' }]);
@@ -398,7 +481,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Hero Section (AI Daily Briefing) */}
+        {/* Hero Section (AI Daily Briefing - Persona Customized) */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -412,15 +495,13 @@ export default function DashboardPage() {
         >
           <div style={{ maxWidth: '75%' }}>
             <span style={{ fontSize: '0.72rem', background: 'rgba(0, 212, 255, 0.12)', color: '#00d4ff', padding: '3px 10px', borderRadius: 99, fontWeight: 700 }}>
-              AI DAILY DIGEST
+              AI DAILY BRIEFING ({persona.toUpperCase()})
             </span>
             <h2 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.4rem', color: '#f0f6ff', marginTop: 10, marginBottom: 8 }}>
               Good Morning, Charlie.
             </h2>
             <p style={{ color: '#8899bb', fontSize: '0.88rem', lineHeight: 1.6 }}>
-              You have <strong style={{ color: '#ec4899' }}>{filteredTasks.length} pending tasks</strong>,{' '}
-              <strong style={{ color: '#ef4444' }}>{filteredDeadlines.length} deadlines</strong> this week,{' '}
-              and <strong style={{ color: '#10b981' }}>{filteredTrackings.length} package delivery</strong> tomorrow.
+              {getHeroBriefingText()}
             </p>
           </div>
 
@@ -817,20 +898,20 @@ export default function DashboardPage() {
 
         </div>
 
-        {/* Premium Detail Overlay Modal */}
+        {/* Premium Detail Overlay Modal (With Novel Feature 1: One-Click AI Reply Draft Assistant) */}
         <AnimatePresence>
           {selectedItem && (
             <div style={{
               position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(8px)',
               display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-            }} onClick={() => setSelectedItem(null)}>
+            }} onClick={() => { setSelectedItem(null); setDraftText(''); }}>
               <motion.div
                 initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
                 transition={{ type: 'spring', damping: 25 }}
                 className="glass-card"
-                style={{ width: '100%', maxWidth: 640, padding: 32, margin: 16, border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: 20 }}
+                style={{ width: '100%', maxWidth: 640, padding: 32, margin: 16, border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: 20, maxHeight: '90vh', overflowY: 'auto' }}
                 onClick={e => e.stopPropagation()}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -857,7 +938,7 @@ export default function DashboardPage() {
                       {selectedItem.subject}
                     </h2>
                   </div>
-                  <button onClick={() => setSelectedItem(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a5a7a' }}>
+                  <button onClick={() => { setSelectedItem(null); setDraftText(''); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#4a5a7a' }}>
                     <X size={18} />
                   </button>
                 </div>
@@ -875,6 +956,50 @@ export default function DashboardPage() {
                     <p style={{ fontSize: '0.82rem', color: '#8899bb', lineHeight: 1.5 }}>
                       {selectedItem.insights.summary}
                     </p>
+                  </div>
+
+                  {/* Novel Feature 1: One-Click AI Reply Generator UI */}
+                  <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div style={{ fontSize: '0.78rem', color: '#7c3aed', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <Mail size={12} /> One-Click AI Draft Assistant
+                      </div>
+                      <button
+                        onClick={() => handleGenerateDraft(selectedItem.subject, selectedItem.body, Object.keys(completedTasks).length > 0)}
+                        disabled={draftLoading}
+                        style={{
+                          background: '#7c3aed', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#fff', fontSize: '0.68rem', cursor: 'pointer'
+                        }}
+                      >
+                        {draftLoading ? 'Generating...' : 'Draft Response'}
+                      </button>
+                    </div>
+
+                    {draftText && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                        <textarea
+                          readOnly
+                          value={draftText}
+                          style={{
+                            width: '100%', height: 100, background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: 8, padding: 8, fontSize: '0.75rem', color: '#f0f6ff', outline: 'none', resize: 'none', fontFamily: 'monospace'
+                          }}
+                        />
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(draftText);
+                            showToast('📋 Draft copied to clipboard!', 'success');
+                          }}
+                          style={{
+                            alignSelf: 'flex-end', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                            borderRadius: 6, padding: '4px 10px', color: '#f0f6ff', fontSize: '0.68rem', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', gap: 4
+                          }}
+                        >
+                          <Copy size={10} /> Copy to Clipboard
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* AI Explainability & Confidence Metrics */}
@@ -905,7 +1030,7 @@ export default function DashboardPage() {
                   {/* Full Text Collapsed */}
                   <div style={{
                     background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: 12, padding: 16,
-                    maxHeight: 180, overflowY: 'auto', fontSize: '0.8rem', color: '#4a5a7a', lineHeight: 1.6, whiteSpace: 'pre-wrap'
+                    maxHeight: 120, overflowY: 'auto', fontSize: '0.8rem', color: '#4a5a7a', lineHeight: 1.6, whiteSpace: 'pre-wrap'
                   }}>
                     {selectedItem.body}
                   </div>
