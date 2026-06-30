@@ -6,13 +6,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard, LayoutGrid, Upload, Users, Settings,
-  Zap, Activity, ChevronRight, LogOut,
+  Zap, Activity, ChevronRight, LogOut, Mail,
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard',   icon: LayoutDashboard },
   { href: '/board',     label: 'Board',        icon: LayoutGrid },
+  { href: '/inbox',     label: 'Inbox',        icon: Mail },
   { href: '/upload',    label: 'Upload',        icon: Upload },
   { href: '/team',      label: 'Team',          icon: Users },
   { href: '/settings',  label: 'Settings',      icon: Settings },

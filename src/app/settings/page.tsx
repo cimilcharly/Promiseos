@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { createClient } from '@/utils/supabase/client';
 
 // ── Section wrapper ────────────────────────────────────────────────────────────
 function Section({ title, icon, children, delay = 0 }: { title: string; icon: React.ReactNode; children: React.ReactNode; delay?: number }) {
@@ -143,6 +144,49 @@ function SettingsContent() {
 
   const [showPricingModal, setShowPricingModal] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null);
+
+  const [emailConsents, setEmailConsents] = useState<any>({
+    gmailAccess: false,
+    aiProcessing: false,
+    taskExtraction: false,
+    continuousSync: false,
+  });
+
+  useEffect(() => {
+    const stored = localStorage.getItem('promiseos_email_consents');
+    if (stored) {
+      setEmailConsents(JSON.parse(stored));
+    }
+  }, []);
+
+  const updateEmailConsent = (key: string, value: boolean) => {
+    const updated = { ...emailConsents, [key]: value };
+    setEmailConsents(updated);
+    localStorage.setItem('promiseos_email_consents', JSON.stringify(updated));
+    showToast('🔒 Privacy consents updated.', 'success');
+  };
+
+  const handlePurgeEmailData = async () => {
+    localStorage.removeItem('promiseos_email_consents');
+    setEmailConsents({
+      gmailAccess: false,
+      aiProcessing: false,
+      taskExtraction: false,
+      continuousSync: false,
+    });
+    try {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        await supabase.from('email_insights').delete().eq('user_id', user.id);
+        await supabase.from('synced_emails').delete().eq('user_id', user.id);
+        await supabase.from('user_email_consents').delete().eq('user_id', user.id);
+      }
+    } catch (e) {
+      console.warn('Could not purge DB data. Local storage has been purged.', e);
+    }
+    showToast('🗑️ Disconnected Google account and permanently deleted synced email data.', 'info');
+  };
 
   // Catch simulated or real billing checkouts
   useEffect(() => {
@@ -354,6 +398,55 @@ function SettingsContent() {
                   Currently: {notificationSettings.reminderHoursBefore}h before deadline
                 </div>
               </div>
+            </div>
+          </Section>
+
+          {/* Email Intelligence & Privacy */}
+          <Section title="Email Intelligence & Privacy" icon={<Shield size={18} />} delay={0.35}>
+            <p style={{ fontSize: '0.82rem', color: '#8899bb', marginBottom: 16, lineHeight: 1.6 }}>
+              Control your Google OAuth connectivity, Gmail data access scopes, and privacy settings.
+            </p>
+            <ToggleSwitch
+              id="settings-toggle-gmail"
+              label="Gmail Integration"
+              sub="Allow access to Gmail data for intelligent categorization"
+              checked={emailConsents.gmailAccess}
+              onChange={v => updateEmailConsent('gmailAccess', v)}
+            />
+            <ToggleSwitch
+              id="settings-toggle-ai"
+              label="AI Processing"
+              sub="Allow AI processing for email summaries and insights"
+              checked={emailConsents.gmailAccess && emailConsents.aiProcessing}
+              onChange={v => updateEmailConsent('aiProcessing', v)}
+            />
+            <ToggleSwitch
+              id="settings-toggle-tasks"
+              label="Task & Deadline Extraction"
+              sub="Allow extraction of tasks, reminders, and deadlines"
+              checked={emailConsents.gmailAccess && emailConsents.taskExtraction}
+              onChange={v => updateEmailConsent('taskExtraction', v)}
+            />
+            <ToggleSwitch
+              id="settings-toggle-sync"
+              label="Continuous Synchronization"
+              sub="Allow continuous background sync for newly received emails"
+              checked={emailConsents.gmailAccess && emailConsents.continuousSync}
+              onChange={v => updateEmailConsent('continuousSync', v)}
+            />
+
+            <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.06)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: '0.875rem', fontWeight: 600, color: '#f0f6ff' }}>Disconnect Google Account</div>
+                <div style={{ fontSize: '0.75rem', color: '#8899bb', marginTop: 2 }}>Permanently delete all synced emails, insights, and tasks.</div>
+              </div>
+              <button
+                onClick={handlePurgeEmailData}
+                className="btn-secondary"
+                style={{ borderColor: '#f43f5e', color: '#f43f5e', fontSize: '0.8rem', padding: '8px 16px' }}
+              >
+                Disconnect & Purge Data
+              </button>
             </div>
           </Section>
 
