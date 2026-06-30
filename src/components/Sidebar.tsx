@@ -5,23 +5,18 @@ import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  LayoutDashboard, LayoutGrid, Upload, Users, Settings,
-  Zap, Activity, ChevronRight, LogOut, Mail,
+  LayoutDashboard, Settings, Zap, Activity, ChevronRight, LogOut
 } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 
 const NAV_ITEMS = [
   { href: '/dashboard', label: 'Dashboard',   icon: LayoutDashboard },
-  { href: '/board',     label: 'Board',        icon: LayoutGrid },
-  { href: '/inbox',     label: 'Inbox',        icon: Mail },
-  { href: '/upload',    label: 'Upload',        icon: Upload },
-  { href: '/team',      label: 'Team',          icon: Users },
   { href: '/settings',  label: 'Settings',      icon: Settings },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { organization, currentUser, isLiveMode, stats, user, signOut } = useApp();
+  const { organization, currentUser, isLiveMode, user, signOut } = useApp();
 
   return (
     <aside className="sidebar">
@@ -43,7 +38,7 @@ export default function Sidebar() {
           </div>
         </div>
         <div style={{ fontSize: '0.7rem', color: '#4a5a7a', paddingLeft: '46px' }}>
-          Commitment Intelligence
+          Personal Intelligence Command
         </div>
       </div>
 
@@ -77,23 +72,6 @@ export default function Sidebar() {
           );
         })}
       </nav>
-
-      {/* Stats quick */}
-      <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: '16px', marginBottom: '16px' }}>
-        <div style={{ fontSize: '0.7rem', color: '#4a5a7a', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-          Live Pulse
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-          <div style={{ background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.15)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f43f5e' }}>{stats.overdue}</div>
-            <div style={{ fontSize: '0.65rem', color: '#8899bb' }}>Overdue</div>
-          </div>
-          <div style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)', borderRadius: 8, padding: '8px 10px', textAlign: 'center' }}>
-            <div style={{ fontSize: '1.1rem', fontWeight: 700, color: '#f59e0b' }}>{stats.dueToday}</div>
-            <div style={{ fontSize: '0.65rem', color: '#8899bb' }}>Due Today</div>
-          </div>
-        </div>
-      </div>
 
       {/* Mode indicator */}
       <div style={{

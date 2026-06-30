@@ -1,6 +1,6 @@
-# Task List: Premium AI Personal Tracking Dashboard
+# Task List: Restructure Product into Personal Tracking Dashboard
 
-- `[x]` UI Overhaul: Redesign `src/app/inbox/page.tsx` into a premium widget dashboard
-- `[x]` UI Overhaul: Integrate interactive AI Chat Assistant panel
-- `[x]` UI Overhaul: Implement expandable details modal for all widgets
+- `[x]` Refactor: Overwrite `src/app/dashboard/page.tsx` with Personal Tracking Dashboard code
+- `[x]` Refactor: Redirect `src/app/inbox/page.tsx` to `/dashboard`
+- `[x]` Refactor: Clean up `src/components/Sidebar.tsx` navigation and stats panel
 - `[x]` Verification: Verify Next.js production compilation (`npm run build`)
