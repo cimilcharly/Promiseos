@@ -31,12 +31,6 @@ const statusColors: Record<string, string> = {
   'Deadlines and reminders': '#ef4444',
 };
 
-interface UserFeedback {
-  emailId: string;
-  type: 'approve' | 'reject';
-  itemKey: string;
-}
-
 export default function DashboardPage() {
   const { user, showToast } = useApp();
   const [consents, setConsents] = useState<any>(null);
@@ -208,7 +202,7 @@ export default function DashboardPage() {
   const travelEmails = processedEmails.filter(e => e.insights.category === 'Travel' || e.subject.toLowerCase().includes('flight') || e.subject.toLowerCase().includes('hotel'));
   const tripBundles: any[] = [];
   if (travelEmails.length > 0) {
-    // Group all into a single trip bundle for San Francisco
+    // Group all into a single trip bundle
     const flight = travelEmails.find(e => e.insights.category === 'Travel');
     tripBundles.push({
       title: 'Trip to New York (Delta Flight DL142)',
@@ -345,7 +339,7 @@ export default function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* Suggested Insights - Confidence Review Gate (Only show if there are items to review) */}
+        {/* Suggested Insights - Confidence Review Gate */}
         <AnimatePresence>
           {suggestedInsights.length > 0 && (
             <motion.div
@@ -621,24 +615,20 @@ export default function DashboardPage() {
               <RefreshCw size={16} color="#a855f7" /> Subscriptions
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {confirmedSubscriptions.length > 0 ? (
-                confirmedSubscriptions.slice(0, 3).map((sub, idx) => (
-                  <div key={idx} onClick={() => setSelectedItem(sub.emailSource)} style={{
-                    padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10,
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
-                  }}>
-                    <div>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff' }}>{sub.name}</div>
-                      <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 4 }}>Cost: {sub.cost}</div>
-                    </div>
-                    <span style={{ fontSize: '0.68rem', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: 4, color: '#a855f7', fontWeight: 700 }}>
-                      Active
-                    </span>
+              {confirmedSubscriptions.slice(0, 3).map((sub, idx) => (
+                <div key={idx} onClick={() => setSelectedItem(sub.emailSource)} style={{
+                  padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10,
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
+                }}>
+                  <div>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff' }}>{sub.name}</div>
+                    <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 4 }}>Cost: {sub.cost}</div>
                   </div>
-                ))
-              ) : (
-                <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center' }}>No subscriptions found.</div>
-              )}
+                  <span style={{ fontSize: '0.68rem', background: 'rgba(168,85,247,0.1)', padding: '2px 8px', borderRadius: 4, color: '#a855f7', fontWeight: 700 }}>
+                    Active
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -679,10 +669,10 @@ export default function DashboardPage() {
                 exit={{ opacity: 0, scale: 0.9, y: 20 }}
                 transition={{ type: 'spring', damping: 25 }}
                 className="glass-card"
-                style={{ width: '100%', maxWidth: 640, padding: 32, margin: 16, border: '1px solid rgba(255,255,255,0.1)' }}
+                style={{ width: '100%', maxWidth: 640, padding: 32, margin: 16, border: '1px solid rgba(255,255,255,0.1)', display: 'flex', flexDirection: 'column', gap: 20 }}
                 onClick={e => e.stopPropagation()}
               >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
                     <span style={{
                       fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: 99,
@@ -716,10 +706,22 @@ export default function DashboardPage() {
                     </p>
                   </div>
 
+                  {/* AI Explainability / Reasoning Box (Resolving Issue 11) */}
+                  {selectedItem.insights.reason && (
+                    <div style={{ background: 'rgba(0, 212, 255, 0.02)', border: '1px solid rgba(0, 212, 255, 0.1)', borderRadius: 12, padding: 16 }}>
+                      <div style={{ fontSize: '0.78rem', color: '#00d4ff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                        <Bot size={12} /> Why is this tracked? (AI Explanation)
+                      </div>
+                      <p style={{ fontSize: '0.82rem', color: '#8899bb', lineHeight: 1.5 }}>
+                        {selectedItem.insights.reason}
+                      </p>
+                    </div>
+                  )}
+
                   {/* Full Text Collapsed */}
                   <div style={{
                     background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: 12, padding: 16,
-                    maxHeight: 200, overflowY: 'auto', fontSize: '0.8rem', color: '#4a5a7a', lineHeight: 1.6, whiteSpace: 'pre-wrap'
+                    maxHeight: 180, overflowY: 'auto', fontSize: '0.8rem', color: '#4a5a7a', lineHeight: 1.6, whiteSpace: 'pre-wrap'
                   }}>
                     {selectedItem.body}
                   </div>

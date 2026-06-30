@@ -33,6 +33,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Finance / bills',
         summary: 'Monthly Vercel team plan invoice generated. $40.00 will be auto-charged on July 5, 2026.',
+        reason: 'Payment-related transaction alert detected. Amount of $40.00 is due in 5 days (July 5th). Auto-added to prevent payment disruption.',
         confidence: 0.98,
         dates: [
           { label: 'Payment Due Date', date: dateOffset(5).split('T')[0] }
@@ -62,6 +63,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Purchases and orders',
         summary: 'Your Keychron K2 Mechanical Keyboard has shipped via UPS. Estimated delivery is tomorrow.',
+        reason: 'Courier shipping dispatch notification detected. Contains valid tracking code and delivery window estimates.',
         confidence: 0.95,
         dates: [
           { label: 'Estimated Delivery Date', date: dateOffset(1).split('T')[0] }
@@ -89,6 +91,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Meetings and calendar events',
         summary: 'Roadmap review meeting scheduled with Sarah Jones on Thursday, July 2, 2026, at 3:00 PM EST.',
+        reason: 'Calendar invitation with Google Meet details detected. Handled schedule alignment block.',
         confidence: 0.94,
         dates: [
           { label: 'Meeting Date', date: dateOffset(2).split('T')[0] }
@@ -113,7 +116,8 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Tasks and action items',
         summary: 'Charlie needs to update express-jwt package dependencies in git and deploy to staging by Friday.',
-        confidence: 0.84, // Sugggested - Review gate required
+        reason: 'Direct task instructions detected ("Charlie - can you update..."). Handled in Suggested queue for verification.',
+        confidence: 0.84, // Suggested - Review gate required
         dates: [
           { label: 'Vulnerability patch deadline', date: dateOffset(3).split('T')[0] }
         ],
@@ -138,6 +142,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Subscriptions',
         summary: 'Claude Pro subscription is renewing on July 14, 2026. $20.00 will be auto-charged.',
+        reason: 'Subscription renewal warnings detected. Placed in Suggested queue to confirm ongoing billing preferences.',
         confidence: 0.81, // Suggested - Review gate required
         dates: [
           { label: 'Subscription Renewal Date', date: dateOffset(14).split('T')[0] }
@@ -165,6 +170,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Travel',
         summary: 'Delta Flight DL142 from SFO to JFK confirmed for July 10, 2026. Depart at 8:30 AM, seat 12C.',
+        reason: 'Flight boarding reservation confirmations detected. Bundled into Travel groups.',
         confidence: 0.96,
         dates: [
           { label: 'Flight Departure Date', date: dateOffset(10).split('T')[0] }
