@@ -68,10 +68,9 @@ export async function POST(request: NextRequest) {
 
     const gmailClient = google.gmail({ version: 'v1', auth: oauth2Client });
 
-    // Fetch message list with a relevant query filter to target only intelligence items
+    // Fetch message list without static keyword filters (relying on AI Stage 1 relevance & priority detection)
     const messageListResponse = await gmailClient.users.messages.list({
       userId: 'me',
-      q: 'invoice OR bill OR payment OR order OR shipped OR tracking OR renewal OR subscription OR meeting OR calendar OR scheduled OR flight OR ticket OR "action required"',
       maxResults: 50,
     });
 
@@ -116,12 +115,22 @@ export async function POST(request: NextRequest) {
         insights = {
           category: 'Personal communication',
           summary: snippet,
+          reason: 'AI processing disabled in consents.',
+          priorityScore: 30,
+          urgency: 'Low' as const,
+          actionRequired: false,
+          confidence: 1.0,
           dates: [],
           tasks: [],
           tracking: {},
           financials: { alert: false },
           subscription: {},
         };
+      }
+
+      // Skip storing or returning spam/irrelevant items to keep DB & Dashboard clean
+      if (insights.category === 'Promotions and spam' || insights.category === 'Irrelevant') {
+        continue;
       }
 
       const emailRecord = {

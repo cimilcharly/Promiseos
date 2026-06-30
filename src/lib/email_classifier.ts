@@ -3,7 +3,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export interface ExtractedEmailInsights {
   category: string;
   summary: string;
-  reason: string; // Explaining why this email is categorized/prioritized (resolving Issue 11)
+  reason: string;
+  priorityScore: number; // 0 to 100 (resolving Issue 3)
+  urgency: 'High' | 'Medium' | 'Low'; // urgency tag (resolving Issue 3)
+  actionRequired: boolean; // intent tracking (resolving Issue 3)
   confidence: number; // Score from 0.0 to 1.0
   dates: { label: string; date: string }[];
   tasks: { task: string; assignee: string; deadline: string }[];
@@ -49,38 +52,52 @@ export async function classifyEmailAndExtractInsights(
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     
-    // Stage 1: Classify Relevance and Category
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
-    const classificationPrompt = `
-Analyze this email and classify it into one of these categories:
-- "Finance / bills"
-- "Job and career"
-- "Meetings and calendar events"
-- "Purchases and orders"
-- "Travel"
-- "Subscriptions"
-- "Personal communication"
-- "Promotions and spam"
-- "Tasks and action items"
-- "Deadlines and reminders"
-- "Irrelevant"
+    // Stage 1: Classify Relevance, Intent, and Priority
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.0-flash',
+      generationConfig: { responseMimeType: 'application/json' },
+    });
 
+    const classificationPrompt = `
+Analyze this email and classify its intent and relevance.
 Email Subject: ${subject}
 Email Body: ${body.slice(0, 1000)}
 
-Respond with ONLY the category string. No explanation or formatting.
+Determine:
+1. Category: "Finance / bills", "Job and career", "Meetings and calendar events", "Purchases and orders", "Travel", "Subscriptions", "Personal communication", "Promotions and spam", "Tasks and action items", "Deadlines and reminders", or "Irrelevant".
+2. Priority Score: 0 to 100.
+3. Urgency: "High", "Medium", or "Low".
+4. Action Required: true if the user needs to reply, pay, attend, do a task, track delivery, or review critical information. Otherwise false.
+5. Is Spam: true if marketing, ads, or newsletters. Otherwise false.
+
+Return a JSON object:
+{
+  "category": "Category name",
+  "priorityScore": 85,
+  "urgency": "High"|"Medium"|"Low",
+  "actionRequired": true|false,
+  "isSpam": true|false
+}
 `;
 
     const classificationResult = await model.generateContent(classificationPrompt);
-    const category = classificationResult.response.text().trim().replace(/['"]/g, '');
+    let classText = classificationResult.response.text().trim();
+    if (classText.startsWith('```json')) classText = classText.substring(7);
+    if (classText.startsWith('```')) classText = classText.substring(3);
+    if (classText.endsWith('```')) classText = classText.substring(0, classText.length - 3);
 
-    // If promotions/spam or irrelevant, return early with low confidence
-    if (category === 'Promotions and spam' || category === 'Irrelevant') {
+    const classParsed = JSON.parse(classText.trim());
+
+    // If promotions/spam or irrelevant, return early with low priority
+    if (classParsed.isSpam || classParsed.category === 'Promotions and spam' || classParsed.category === 'Irrelevant') {
       return {
-        category,
+        category: classParsed.category || 'Promotions and spam',
         summary: 'Classified as promotional or irrelevant email.',
         reason: 'Subject line or body contents match commercial newsletter/promotional spam triggers.',
-        confidence: 0.35,
+        priorityScore: classParsed.priorityScore || 20,
+        urgency: 'Low',
+        actionRequired: false,
+        confidence: 0.90,
         dates: [],
         tasks: [],
         tracking: {},
@@ -98,7 +115,7 @@ Respond with ONLY the category string. No explanation or formatting.
     const todayStr = new Date().toISOString().split('T')[0];
 
     const extractionPrompt = `
-You are an email analysis AI. Analyze the email subject and body below for category: "${category}".
+You are an email analysis AI. Analyze the email subject and body below for category: "${classParsed.category}".
 Today is ${todayStr}.
 
 Email Subject: ${subject}
@@ -152,7 +169,10 @@ Return ONLY valid JSON.
 
     const parsed = JSON.parse(text.trim());
     return {
-      category,
+      category: classParsed.category,
+      priorityScore: classParsed.priorityScore,
+      urgency: classParsed.urgency,
+      actionRequired: classParsed.actionRequired,
       ...parsed,
     };
   } catch (error) {
@@ -174,6 +194,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     category: 'Personal communication',
     summary: `An email regarding "${subject}".`,
     reason: 'Contains general personal communication without immediate commitments.',
+    priorityScore: 30,
+    urgency: 'Low',
+    actionRequired: false,
     confidence: 0.95,
     dates: [],
     tasks: [],
@@ -186,6 +209,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.category = 'Finance / bills';
     result.summary = `Invoice or billing statement received for ${subject}.`;
     result.reason = 'Invoice statements require attention; payment details extracted to prevent late fee penalties.';
+    result.priorityScore = 95;
+    result.urgency = 'High';
+    result.actionRequired = true;
     result.confidence = 0.98;
     result.dates = [{ label: 'Payment due date', date: futureDate(5) }];
     result.tasks = [{ task: `Pay outstanding bill for ${subject}`, assignee: 'Me', deadline: futureDate(5) }];
@@ -199,6 +225,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.category = 'Purchases and orders';
     result.summary = `Order confirmation and shipping status update.`;
     result.reason = 'Tracking code detected for active shipment. Placed in tracker progress pipeline.';
+    result.priorityScore = 80;
+    result.urgency = 'Medium';
+    result.actionRequired = true;
     result.confidence = 0.94;
     result.dates = [{ label: 'Estimated delivery', date: futureDate(3) }];
     result.tracking = {
@@ -211,6 +240,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.category = 'Meetings and calendar events';
     result.summary = `Invitation or details for a meeting: "${subject}".`;
     result.reason = 'Calendar invitation details detected. Action item created for scheduling agenda review.';
+    result.priorityScore = 85;
+    result.urgency = 'High';
+    result.actionRequired = true;
     result.confidence = 0.88;
     result.dates = [{ label: 'Meeting date', date: futureDate(1) }];
     result.tasks = [{ task: `Attend meeting: ${subject}`, assignee: 'Me', deadline: futureDate(1) }];
@@ -218,6 +250,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.category = 'Subscriptions';
     result.summary = `Subscription details or upcoming renewal notice.`;
     result.reason = 'SaaS subscription renewal warning. Tracked in Subscriptions list to manage ongoing monthly outlays.';
+    result.priorityScore = 65;
+    result.urgency = 'Medium';
+    result.actionRequired = true;
     result.confidence = 0.92;
     result.dates = [{ label: 'Renewal date', date: futureDate(14) }];
     result.subscription = {
@@ -230,6 +265,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.category = 'Job and career';
     result.summary = `Correspondence regarding a job application or interview status.`;
     result.reason = 'Active career opportunities or interview scheduling detected. Flagged for preparation support.';
+    result.priorityScore = 78;
+    result.urgency = 'Medium';
+    result.actionRequired = true;
     result.confidence = 0.85;
     result.dates = [{ label: 'Interview appointment', date: futureDate(2) }];
     result.tasks = [{ task: 'Prepare portfolio and review interview questions', assignee: 'Me', deadline: futureDate(2) }];
@@ -237,6 +275,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.category = 'Travel';
     result.summary = `Travel booking confirmation and itinerary details.`;
     result.reason = 'Itinerary ticket confirmation detected. Bundled under trip tracker.';
+    result.priorityScore = 90;
+    result.urgency = 'High';
+    result.actionRequired = true;
     result.confidence = 0.96;
     result.dates = [{ label: 'Departure', date: futureDate(10) }];
     result.tasks = [{ task: 'Check-in for flight online', assignee: 'Me', deadline: futureDate(9) }];
@@ -244,6 +285,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.category = 'Tasks and action items';
     result.summary = `Action item requested in email: "${subject}".`;
     result.reason = 'Instructional wording detected in mail body indicating a direct task assignment.';
+    result.priorityScore = 75;
+    result.urgency = 'Medium';
+    result.actionRequired = true;
     result.confidence = 0.76;
     result.dates = [{ label: 'Task deadline', date: futureDate(4) }];
     result.tasks = [{ task: `Complete task: ${subject}`, assignee: 'Me', deadline: futureDate(4) }];
@@ -251,6 +295,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.category = 'Promotions and spam';
     result.summary = `Promotional deal or update newsletter.`;
     result.reason = 'Identified as mass marketing materials or newsletters.';
+    result.priorityScore = 15;
+    result.urgency = 'Low';
+    result.actionRequired = false;
     result.confidence = 0.45;
   }
 

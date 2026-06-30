@@ -1,6 +1,7 @@
-# Task List: AI Explainability & Trust Upgrades
+# Task List: AI Relevance & Intent Detection Pipeline
 
-- `[ ]` Refactor: Add reason attribute to AI output schema (`src/lib/email_classifier.ts`)
-- `[ ]` Refactor: Update Mock Emails database with reasoning attributes (`src/lib/mock_emails.ts`)
-- `[ ]` Refactor: Render AI Reasoning blocks inside Dashboard overlays (`src/app/dashboard/page.tsx`)
+- `[ ]` Refactor: Update AI Classifier with Intent Classification & Priority scoring (`src/lib/email_classifier.ts`)
+- `[ ]` Refactor: Update Mock Emails database with priority/urgency attributes (`src/lib/mock_emails.ts`)
+- `[ ]` Refactor: Remove keyword limits from sync-emails Gmail API call (`src/app/api/sync-emails/route.ts`)
+- `[ ]` Refactor: Display priority indicators and urgency tags on Dashboard cards (`src/app/dashboard/page.tsx`)
 - `[ ]` Verification: Verify Next.js production compilation (`npm run build`)

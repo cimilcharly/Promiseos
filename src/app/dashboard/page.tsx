@@ -31,6 +31,12 @@ const statusColors: Record<string, string> = {
   'Deadlines and reminders': '#ef4444',
 };
 
+const urgencyColors: Record<string, string> = {
+  'High': '#ef4444',
+  'Medium': '#f59e0b',
+  'Low': '#10b981',
+};
+
 export default function DashboardPage() {
   const { user, showToast } = useApp();
   const [consents, setConsents] = useState<any>(null);
@@ -198,11 +204,9 @@ export default function DashboardPage() {
   });
 
   // 2. Cross-Email Relationship Detection (Trip Bundling)
-  // Group travel bookings and flights together
   const travelEmails = processedEmails.filter(e => e.insights.category === 'Travel' || e.subject.toLowerCase().includes('flight') || e.subject.toLowerCase().includes('hotel'));
   const tripBundles: any[] = [];
   if (travelEmails.length > 0) {
-    // Group all into a single trip bundle
     const flight = travelEmails.find(e => e.insights.category === 'Travel');
     tripBundles.push({
       title: 'Trip to New York (Delta Flight DL142)',
@@ -436,6 +440,13 @@ export default function DashboardPage() {
                       </span>
                     </div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 700, borderRadius: 6, padding: '2px 6px',
+                        color: urgencyColors[t.emailSource.insights.urgency] || '#8899bb',
+                        background: `${urgencyColors[t.emailSource.insights.urgency] || '#8899bb'}14`
+                      }}>
+                        {t.emailSource.insights.urgency}
+                      </span>
                       <span style={{ fontSize: '0.7rem', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '3px 8px', color: '#8899bb' }}>
                         Due {t.deadline}
                       </span>
@@ -674,14 +685,24 @@ export default function DashboardPage() {
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                   <div>
-                    <span style={{
-                      fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: 99,
-                      color: statusColors[selectedItem.insights.category] || '#8899bb',
-                      background: `${statusColors[selectedItem.insights.category] || '#8899bb'}14`,
-                      border: `1px solid ${statusColors[selectedItem.insights.category] || '#8899bb'}25`
-                    }}>
-                      {selectedItem.insights.category}
-                    </span>
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: 99,
+                        color: statusColors[selectedItem.insights.category] || '#8899bb',
+                        background: `${statusColors[selectedItem.insights.category] || '#8899bb'}14`,
+                        border: `1px solid ${statusColors[selectedItem.insights.category] || '#8899bb'}25`
+                      }}>
+                        {selectedItem.insights.category}
+                      </span>
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: 99,
+                        color: urgencyColors[selectedItem.insights.urgency] || '#8899bb',
+                        background: `${urgencyColors[selectedItem.insights.urgency] || '#8899bb'}14`,
+                        border: `1px solid ${urgencyColors[selectedItem.insights.urgency] || '#8899bb'}25`
+                      }}>
+                        Priority Score: {selectedItem.insights.priorityScore || 50}
+                      </span>
+                    </div>
                     <h2 style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 700, fontSize: '1.2rem', color: '#f0f6ff', marginTop: 10 }}>
                       {selectedItem.subject}
                     </h2>
@@ -706,7 +727,7 @@ export default function DashboardPage() {
                     </p>
                   </div>
 
-                  {/* AI Explainability / Reasoning Box (Resolving Issue 11) */}
+                  {/* AI Explainability / Reasoning Box */}
                   {selectedItem.insights.reason && (
                     <div style={{ background: 'rgba(0, 212, 255, 0.02)', border: '1px solid rgba(0, 212, 255, 0.1)', borderRadius: 12, padding: 16 }}>
                       <div style={{ fontSize: '0.78rem', color: '#00d4ff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
