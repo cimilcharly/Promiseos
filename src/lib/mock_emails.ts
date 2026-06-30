@@ -37,14 +37,11 @@ export function getMockEmails(): MockEmail[] {
         priorityScore: 98,
         urgency: 'High',
         actionRequired: true,
-        
-        // Granular Confidence
         categoryConfidence: 0.98,
         taskConfidence: 0.95,
         deadlineConfidence: 0.96,
         financialsConfidence: 0.98,
         trackingConfidence: 0.90,
-
         dates: [
           { label: 'Payment Due Date', date: dateOffset(5).split('T')[0] }
         ],
@@ -77,14 +74,11 @@ export function getMockEmails(): MockEmail[] {
         priorityScore: 82,
         urgency: 'Medium',
         actionRequired: true,
-
-        // Granular Confidence
         categoryConfidence: 0.96,
         taskConfidence: 0.90,
         deadlineConfidence: 0.92,
         financialsConfidence: 0.80,
         trackingConfidence: 0.95,
-
         dates: [
           { label: 'Estimated Delivery Date', date: dateOffset(1).split('T')[0] }
         ],
@@ -115,14 +109,11 @@ export function getMockEmails(): MockEmail[] {
         priorityScore: 88,
         urgency: 'High',
         actionRequired: true,
-
-        // Granular Confidence
         categoryConfidence: 0.94,
         taskConfidence: 0.92,
         deadlineConfidence: 0.94,
         financialsConfidence: 0.80,
         trackingConfidence: 0.80,
-
         dates: [
           { label: 'Meeting Date', date: dateOffset(2).split('T')[0] }
         ],
@@ -131,7 +122,12 @@ export function getMockEmails(): MockEmail[] {
         ],
         tracking: {},
         financials: { alert: false },
-        subscription: {}
+        subscription: {},
+        meeting: {
+          time: '3:00 PM EST',
+          joinLink: 'https://meet.google.com/abc-defg-hij',
+          venue: 'Google Meet'
+        }
       }
     },
     {
@@ -150,14 +146,11 @@ export function getMockEmails(): MockEmail[] {
         priorityScore: 78,
         urgency: 'Medium',
         actionRequired: true,
-
-        // Granular Confidence (Gated to Suggested queue: overall average is ~81%)
         categoryConfidence: 0.88,
         taskConfidence: 0.84,
         deadlineConfidence: 0.82,
         financialsConfidence: 0.70,
         trackingConfidence: 0.70,
-
         dates: [
           { label: 'Vulnerability patch deadline', date: dateOffset(3).split('T')[0] }
         ],
@@ -186,14 +179,11 @@ export function getMockEmails(): MockEmail[] {
         priorityScore: 72,
         urgency: 'Medium',
         actionRequired: true,
-
-        // Granular Confidence (Gated to Suggested queue: overall average is ~81%)
         categoryConfidence: 0.90,
         taskConfidence: 0.80,
         deadlineConfidence: 0.82,
         financialsConfidence: 0.81,
         trackingConfidence: 0.70,
-
         dates: [
           { label: 'Subscription Renewal Date', date: dateOffset(14).split('T')[0] }
         ],
@@ -224,14 +214,11 @@ export function getMockEmails(): MockEmail[] {
         priorityScore: 92,
         urgency: 'High',
         actionRequired: true,
-
-        // Granular Confidence
         categoryConfidence: 0.96,
         taskConfidence: 0.95,
         deadlineConfidence: 0.96,
         financialsConfidence: 0.90,
         trackingConfidence: 0.92,
-
         dates: [
           { label: 'Flight Departure Date', date: dateOffset(10).split('T')[0] }
         ],

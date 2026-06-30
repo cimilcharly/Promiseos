@@ -9,7 +9,7 @@ import {
   Truck, Search, RefreshCw, AlertTriangle, CheckCircle,
   Eye, Clock, Sparkles, Filter, Trash2, ArrowUpRight,
   Send, Bot, User as UserIcon, Plus, X, BarChart3, TrendingUp,
-  ThumbsUp, ThumbsDown, Luggage, Layers
+  ThumbsUp, ThumbsDown, Luggage, Layers, Video, PlusCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MockEmail } from '@/lib/mock_emails';
@@ -134,7 +134,7 @@ export default function DashboardPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Chat Submission Handler
+  // Chat Submission Handler (resolving Issue 9 - Personal Memory Vault RAG operations)
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -144,45 +144,28 @@ export default function DashboardPage() {
     setChatInput('');
     setChatLoading(true);
 
-    setTimeout(() => {
-      let botResponse = "I couldn't find specific info about that in your synced data. Try asking about 'bills', 'tasks', 'deliveries', or 'meetings'.";
-      const query = userText.toLowerCase();
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: userText,
+          emails, // Feed full context to RAG model
+        }),
+      });
 
-      if (query.includes('bill') || query.includes('invoice') || query.includes('money') || query.includes('pay')) {
-        const bills = confirmedBills;
-        if (bills.length > 0) {
-          botResponse = `You have ${bills.length} bills pending. The largest is for ${bills[0].biller} of ${bills[0].amount} due on ${bills[0].dueDate}.`;
-        } else {
-          botResponse = "No pending bills found in your synced emails.";
-        }
-      } else if (query.includes('task') || query.includes('todo') || query.includes('action')) {
-        const tasks = confirmedTasks.filter(t => !completedTasks[t.task]);
-        if (tasks.length > 0) {
-          botResponse = `Here are your pending tasks:\n` + tasks.map((t, idx) => `${idx + 1}. ${t.task} (due ${t.deadline})`).join('\n');
-        } else {
-          botResponse = "Excellent! You have no pending tasks extracted from your emails.";
-        }
-      } else if (query.includes('delivery') || query.includes('package') || query.includes('order') || query.includes('shipment')) {
-        const trackings = confirmedTrackings;
-        if (trackings.length > 0) {
-          botResponse = `You have ${trackings.length} active delivery. Package from ${trackings[0].provider} (Tracking: ${trackings[0].trackingNumber}) is currently "${trackings[0].status}".`;
-        } else {
-          botResponse = "No active order tracking found in your emails.";
-        }
-      } else if (query.includes('meeting') || query.includes('schedule') || query.includes('calendar')) {
-        const meetings = confirmedMeetings;
-        if (meetings.length > 0) {
-          botResponse = `You have an upcoming meeting: "${meetings[0].title}" scheduled for ${meetings[0].date || 'soon'}.`;
-        } else {
-          botResponse = "No upcoming meetings found in your emails.";
-        }
-      } else if (query.includes('hi') || query.includes('hello') || query.includes('hey')) {
-        botResponse = "Hello! I am your personal tracking assistant. How can I help you navigate your commitments today?";
+      const data = await response.json();
+      if (data.response) {
+        setChatMessages(prev => [...prev, { sender: 'bot', text: data.response }]);
+      } else {
+        throw new Error(data.error || 'Failed memory vault retrieval');
       }
-
-      setChatMessages(prev => [...prev, { sender: 'bot', text: botResponse }]);
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { sender: 'bot', text: 'Failed to access Memory Vault. Fallback system offline.' }]);
+    } finally {
       setChatLoading(false);
-    }, 1000);
+    }
   };
 
   // Feedback Learning Loop triggers
@@ -215,7 +198,7 @@ export default function DashboardPage() {
     return true;
   });
 
-  // 2. Intelligent AI Relationship Mapping (resolving Issue 5)
+  // 2. Intelligent AI Relationship Mapping
   const detectRelationships = (emailsList: MockEmail[]): RelationshipBundle[] => {
     const bundles: RelationshipBundle[] = [];
     const getEntityVendor = (subject: string, from: string) => {
@@ -313,12 +296,18 @@ export default function DashboardPage() {
   const confirmedDates = processedEmails.flatMap(e => (e.insights.dates || []).map(d => ({ ...d, emailSource: e })));
   const confirmedBills = processedEmails.filter(e => e.insights.financials?.alert).map(e => ({ ...e.insights.financials, emailSource: e }));
   const confirmedTrackings = processedEmails.filter(e => e.insights.tracking?.trackingNumber).map(e => ({ ...e.insights.tracking, emailSource: e }));
+  
+  // Upgraded Meeting Parser
   const confirmedMeetings = processedEmails.filter(e => e.insights.category === 'Meetings and calendar events').map(e => ({
     title: e.subject,
     date: e.insights.dates?.[0]?.date || 'TBD',
+    time: e.insights.meeting?.time || 'TBD',
+    joinLink: e.insights.meeting?.joinLink,
+    venue: e.insights.meeting?.venue || 'Google Meet',
     summary: e.insights.summary,
     emailSource: e
   }));
+
   const confirmedSubscriptions = processedEmails.filter(e => e.insights.subscription?.name).map(e => ({ ...e.insights.subscription, emailSource: e }));
 
   // Search Filter across confirmed items
@@ -328,6 +317,15 @@ export default function DashboardPage() {
   const filteredDeadlines = confirmedDates.filter(d => matchesSearch(d.label));
   const filteredBills = confirmedBills.filter(b => matchesSearch(b.biller || ''));
   const filteredTrackings = confirmedTrackings.filter(t => matchesSearch(t.provider || '') || matchesSearch(t.trackingNumber || ''));
+
+  // Google Calendar URL Generator Helper
+  const getGoogleCalendarLink = (title: string, date: string, time: string, joinLink?: string) => {
+    const cleanDate = date.replace(/-/g, '');
+    const startDateTime = `${cleanDate}T090000Z`; // Default to 9 AM
+    const endDateTime = `${cleanDate}T100000Z`;
+    const details = `Extracted automatically by PromiseOS.\nJoin Link: ${joinLink || 'Online'}`;
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startDateTime}/${endDateTime}&details=${encodeURIComponent(details)}&location=${encodeURIComponent(joinLink || 'Online')}`;
+  };
 
   // Analytics Chart Data
   const chartData = [
@@ -553,7 +551,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 2. AI Chatbot Assistant (Col Span: 4) */}
+          {/* 2. AI Chatbot Assistant */}
           <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, height: 320, display: 'flex', flexDirection: 'column' }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#00d4ff', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Bot size={16} /> AI Personal Assistant
@@ -605,7 +603,7 @@ export default function DashboardPage() {
             </form>
           </div>
 
-          {/* 3. AI-Powered Relationship Detection Widget (resolving Issue 5) */}
+          {/* 3. AI-Powered Relationship Detection Widget */}
           <div className="glass-card" style={{ gridColumn: 'span 12', padding: 24 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.95rem', color: '#f0f6ff', marginBottom: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
               <Layers size={16} color="#06b6d4" /> Activity Bundles (Relationship Tracking)
@@ -713,7 +711,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 6. Meetings & Schedule (Col Span: 4) */}
+          {/* 6. Meetings & Schedule */}
           <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Calendar size={16} color="#7c3aed" /> Schedule & Agenda
@@ -721,13 +719,49 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {confirmedMeetings.length > 0 ? (
                 confirmedMeetings.slice(0, 3).map((meet, idx) => (
-                  <div key={idx} onClick={() => setSelectedItem(meet.emailSource)} style={{
-                    padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, cursor: 'pointer'
+                  <div key={idx} style={{
+                    padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10,
+                    display: 'flex', flexDirection: 'column', gap: 10
                   }}>
-                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {meet.title}
+                    <div onClick={() => setSelectedItem(meet.emailSource)} style={{ cursor: 'pointer' }}>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {meet.title}
+                      </div>
+                      <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
+                        <span>Date: {meet.date}</span>
+                        <span style={{ color: '#7c3aed' }}>{meet.time}</span>
+                      </div>
+                      <div style={{ fontSize: '0.65rem', color: '#4a5a7a', marginTop: 2 }}>Platform: {meet.venue}</div>
                     </div>
-                    <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 4 }}>Date: {meet.date}</div>
+
+                    <div style={{ display: 'flex', gap: 8, borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 8 }}>
+                      {meet.joinLink && (
+                        <a
+                          href={meet.joinLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            flex: 1, textDecoration: 'none', background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.2)',
+                            borderRadius: 6, padding: '4px 0', fontSize: '0.68rem', color: '#00d4ff', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4
+                          }}
+                        >
+                          <Video size={10} /> Join Meeting
+                        </a>
+                      )}
+                      <a
+                        href={getGoogleCalendarLink(meet.title, meet.date, meet.time, meet.joinLink)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={{
+                          flex: 1, textDecoration: 'none', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                          borderRadius: 6, padding: '4px 0', fontSize: '0.68rem', color: '#f0f6ff', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4
+                        }}
+                      >
+                        <PlusCircle size={10} /> Calendar
+                      </a>
+                    </div>
                   </div>
                 ))
               ) : (

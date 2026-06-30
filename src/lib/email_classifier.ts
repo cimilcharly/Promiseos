@@ -8,7 +8,7 @@ export interface ExtractedEmailInsights {
   urgency: 'High' | 'Medium' | 'Low';
   actionRequired: boolean;
   
-  // Granular Confidence Parameters (resolving Issue 4)
+  // Granular Confidence Parameters
   categoryConfidence: number;
   taskConfidence: number;
   deadlineConfidence: number;
@@ -20,6 +20,9 @@ export interface ExtractedEmailInsights {
   tracking: { provider?: string; trackingNumber?: string; status?: string; deliveryDate?: string };
   financials: { amount?: string; dueDate?: string; alert?: boolean; biller?: string };
   subscription: { name?: string; cost?: string; renewalDate?: string; autoRenew?: boolean };
+  
+  // Meeting details (resolving details under Issue 4)
+  meeting?: { time?: string; joinLink?: string; venue?: string };
 }
 
 // 1. Preprocessing Layer: Clean email body to save tokens and improve quality
@@ -44,7 +47,7 @@ export function preprocessEmailBody(body: string): string {
   return cleaned.trim().slice(0, 3000); // Truncate safely
 }
 
-// 2. Programmatic Validation Layer (resolving Issue 4)
+// 2. Programmatic Validation Layer
 export function validateInsights(insights: ExtractedEmailInsights): ExtractedEmailInsights {
   const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
   const today = new Date();
@@ -55,14 +58,14 @@ export function validateInsights(insights: ExtractedEmailInsights): ExtractedEma
     insights.dates = insights.dates.filter(d => {
       // Validate date format (YYYY-MM-DD)
       if (!dateRegex.test(d.date)) {
-        insights.deadlineConfidence = 0.35; // Lower confidence dramatically if invalid format
+        insights.deadlineConfidence = 0.35;
         return false;
       }
       
-      // Check if date is logically in the past (e.g. past deadlines cannot be auto-added)
+      // Check if date is logically in the past
       const dateVal = new Date(d.date);
       if (dateVal < today) {
-        insights.deadlineConfidence = 0.45; // Flag date in past
+        insights.deadlineConfidence = 0.45;
       }
       return true;
     });
@@ -81,7 +84,7 @@ export function validateInsights(insights: ExtractedEmailInsights): ExtractedEma
   if (insights.financials?.amount) {
     const cleanAmount = insights.financials.amount.replace(/[$\u20B9,\s]/g, '');
     if (isNaN(Number(cleanAmount))) {
-      insights.financialsConfidence = Math.min(insights.financialsConfidence, 0.5); // Flag corrupt currency formats
+      insights.financialsConfidence = Math.min(insights.financialsConfidence, 0.5);
     }
   }
 
@@ -182,11 +185,12 @@ ${body}
 """
 
 Extract structured information. Provide an explicit explanation under "reason" clarifying why this email was flagged as important.
-Provide confidence ratings (0.0 to 1.0) for:
-- taskConfidence: how certain you are of tasks extracted
-- deadlineConfidence: how certain you are of dates/deadlines extracted
-- financialsConfidence: how certain you are of biller/cost parameters extracted
-- trackingConfidence: how certain you are of shipping tracking parameters extracted
+Provide confidence ratings (0.0 to 1.0) for extraction.
+
+If it is a meeting or calendar event, extract:
+- time: e.g., "10:00 AM" or "3:00 PM EST" (optional)
+- joinLink: URL of Google Meet or Zoom (optional)
+- venue: location name, e.g., "Google Meet" or "Conference Room B" (optional)
 
 Return a JSON object:
 {
@@ -200,7 +204,7 @@ Return a JSON object:
     { "label": "e.g. Payment due, Flight departure", "date": "YYYY-MM-DD" }
   ],
   "tasks": [
-    { "task": "Actionable task", "assignee": "Person responsible (usually 'Me')", "deadline": "YYYY-MM-DD" }
+    { "task": "Actionable task", "assignee": "Person responsible", "deadline": "YYYY-MM-DD" }
   ],
   "tracking": {
     "provider": "UPS|FedEx|DHL|Amazon (optional)",
@@ -219,6 +223,11 @@ Return a JSON object:
     "cost": "e.g., $10/mo (optional)",
     "renewalDate": "YYYY-MM-DD (optional)",
     "autoRenew": true|false
+  },
+  "meeting": {
+    "time": "Meeting start time (optional)",
+    "joinLink": "Google Meet or Zoom URL (optional)",
+    "venue": "Location or platform (optional)"
   }
 }
 Return ONLY valid JSON.
@@ -326,6 +335,11 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.deadlineConfidence = 0.94;
     result.dates = [{ label: 'Meeting date', date: futureDate(1) }];
     result.tasks = [{ task: `Attend meeting: ${subject}`, assignee: 'Me', deadline: futureDate(1) }];
+    result.meeting = {
+      time: '3:00 PM EST',
+      joinLink: 'https://meet.google.com/abc-defg-hij',
+      venue: 'Google Meet',
+    };
   } else if (subjLower.includes('subscription') || subjLower.includes('renew') || subjLower.includes('membership')) {
     result.category = 'Subscriptions';
     result.summary = `Subscription details or upcoming renewal notice.`;
@@ -353,6 +367,11 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.taskConfidence = 0.85;
     result.dates = [{ label: 'Interview appointment', date: futureDate(2) }];
     result.tasks = [{ task: 'Prepare portfolio and review interview questions', assignee: 'Me', deadline: futureDate(2) }];
+    result.meeting = {
+      time: '10:00 AM',
+      joinLink: 'https://meet.google.com/xyz-pdqr-lmn',
+      venue: 'Google Meet',
+    };
   } else if (subjLower.includes('trip') || subjLower.includes('flight') || subjLower.includes('hotel') || subjLower.includes('booking')) {
     result.category = 'Travel';
     result.summary = `Travel booking confirmation and itinerary details.`;
