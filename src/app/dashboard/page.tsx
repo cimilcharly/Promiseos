@@ -55,12 +55,15 @@ export default function DashboardPage() {
   const [emails, setEmails] = useState<MockEmail[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Novel Feature 4: Interactive Command Persona State
+  // Interactive Command Persona State
   const [persona, setPersona] = useState<'Executive Minimalist' | 'The Motivator' | 'The Auditor'>('Executive Minimalist');
 
-  // Novel Feature 1: One-Click Reply Draft State
+  // One-Click Reply Draft State
   const [draftText, setDraftText] = useState('');
   const [draftLoading, setDraftLoading] = useState(false);
+
+  // Preference weights for dynamic learning feedback loop (resolving Issue: MVP Preference Learning)
+  const [preferences, setPreferences] = useState<Record<string, number>>({});
 
   // Interactive States
   const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -87,6 +90,9 @@ export default function DashboardPage() {
 
     const storedPersona = localStorage.getItem('promiseos_active_persona');
     if (storedPersona) setPersona(storedPersona as any);
+
+    const storedPrefs = localStorage.getItem('promiseos_user_preferences');
+    if (storedPrefs) setPreferences(JSON.parse(storedPrefs));
   }, []);
 
   const handleAcceptConsents = (newConsents: any) => {
@@ -101,7 +107,9 @@ export default function DashboardPage() {
     setEmails([]);
     setSelectedItem(null);
     setFeedbacks({});
+    setPreferences({});
     localStorage.removeItem('promiseos_user_feedback');
+    localStorage.removeItem('promiseos_user_preferences');
     showToast('🔒 Connection settings reset.', 'info');
   };
 
@@ -211,17 +219,52 @@ export default function DashboardPage() {
     }
   };
 
-  // Feedback Learning Loop triggers
+  // Feedback Learning Loop triggers (resolving Preference Learning weight shifts)
   const handleFeedback = (emailId: string, action: 'approved' | 'rejected') => {
-    const updated = { ...feedbacks, [emailId]: action };
-    setFeedbacks(updated);
-    localStorage.setItem('promiseos_user_feedback', JSON.stringify(updated));
-    showToast(action === 'approved' ? '✅ Insight approved and added.' : '❌ Insight rejected.', 'info');
+    const emailItem = emails.find(e => e.id === emailId);
+    if (emailItem) {
+      const category = emailItem.insights.category;
+      const currentWeight = preferences[category] ?? 1.0;
+      
+      let newWeight = currentWeight;
+      if (action === 'approved') {
+        newWeight = Math.min(1.5, currentWeight + 0.1);
+      } else {
+        newWeight = Math.max(0.1, currentWeight - 0.2);
+      }
+      
+      const updatedPrefs = { ...preferences, [category]: parseFloat(newWeight.toFixed(2)) };
+      setPreferences(updatedPrefs);
+      localStorage.setItem('promiseos_user_preferences', JSON.stringify(updatedPrefs));
+    }
+
+    const updatedFeedback = { ...feedbacks, [emailId]: action };
+    setFeedbacks(updatedFeedback);
+    localStorage.setItem('promiseos_user_feedback', JSON.stringify(updatedFeedback));
+    showToast(action === 'approved' ? '✅ Weight boosted. Insight approved.' : '❌ Weight reduced. Insight rejected.', 'info');
   };
 
-  // 1. Process Confidence Gating
+  // 1. Process Confidence Gating & Dynamic Preference Weights
   const suggestedInsights: any[] = [];
-  const processedEmails = emails.filter(email => {
+  const processedEmails = emails.map(email => {
+    const category = email.insights.category;
+    const weight = preferences[category] ?? 1.0;
+    
+    // Scale priority score dynamically by preference weight (resolving MVP Preference Learning)
+    const adjustedInsights = {
+      ...email.insights,
+      priorityScore: Math.min(100, Math.round(email.insights.priorityScore * weight))
+    };
+    
+    if (weight < 0.4) {
+      adjustedInsights.urgency = 'Low';
+    }
+
+    return {
+      ...email,
+      insights: adjustedInsights
+    };
+  }).filter(email => {
     const feedback = feedbacks[email.id];
     if (feedback === 'rejected') return false;
 
@@ -353,7 +396,7 @@ export default function DashboardPage() {
 
   const confirmedSubscriptions = processedEmails.filter(e => e.insights.subscription?.name).map(e => ({ ...e.insights.subscription, emailSource: e }));
 
-  // Novel Feature: Intent-based Widget Mapping lists (resolving Informational Emails Missed)
+  // Novel Feature: Intent-based Widget Mapping lists
   const confirmedOpportunities = processedEmails.filter(e => e.insights.intent === 'Opportunity');
   const confirmedSecurityAlerts = processedEmails.filter(e => e.insights.intent === 'Security Alert');
   const confirmedUpdatesFeed = processedEmails.filter(e => e.insights.intent === 'Informational' || e.insights.intent === 'Financial Notice' || e.insights.intent === 'Reference Information');
@@ -752,7 +795,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Dynamic Intelligence Section (resolving Informational Emails Missed) */}
+          {/* Dynamic Intelligence Section */}
           {/* 4. Opportunity Center */}
           <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, minHeight: 220 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
