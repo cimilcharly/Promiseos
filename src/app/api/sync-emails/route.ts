@@ -66,10 +66,11 @@ export async function POST(request: NextRequest) {
 
     const gmailClient = google.gmail({ version: 'v1', auth: oauth2Client });
 
-    // Fetch message list
+    // Fetch message list with a relevant query filter to target only intelligence items
     const messageListResponse = await gmailClient.users.messages.list({
       userId: 'me',
-      maxResults: 10,
+      q: 'invoice OR bill OR payment OR order OR shipped OR tracking OR renewal OR subscription OR meeting OR calendar OR scheduled OR flight OR ticket OR "action required"',
+      maxResults: 50,
     });
 
     const messagesMetadata = messageListResponse.data.messages || [];
