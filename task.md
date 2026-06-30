@@ -1,6 +1,4 @@
-# Task List: Granular Confidence Scoring & Validation Layer
+# Task List: AI Relationship Detection & Entity Linking Layer
 
-- `[ ]` Refactor: Update AI classifier output schema with granular confidence scores and validation logic (`src/lib/email_classifier.ts`)
-- `[ ]` Refactor: Update Mock Emails database with granular confidence ratings (`src/lib/mock_emails.ts`)
-- `[ ]` Refactor: Display granular confidence statistics in Dashboard detail drawers (`src/app/dashboard/page.tsx`)
+- `[ ]` Refactor: Implement the `detectRelationships` entity grouping engine in Dashboard (`src/app/dashboard/page.tsx`)
 - `[ ]` Verification: Verify Next.js production compilation (`npm run build`)
