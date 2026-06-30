@@ -9,7 +9,8 @@ import {
   Truck, Search, RefreshCw, AlertTriangle, CheckCircle,
   Eye, Clock, Sparkles, Filter, Trash2, ArrowUpRight,
   Send, Bot, User as UserIcon, Plus, X, BarChart3, TrendingUp,
-  ThumbsUp, ThumbsDown, Luggage, Layers, Video, PlusCircle, Copy
+  ThumbsUp, ThumbsDown, Luggage, Layers, Video, PlusCircle, Copy,
+  Award, ShieldCheck, Newspaper
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MockEmail } from '@/lib/mock_emails';
@@ -144,7 +145,7 @@ export default function DashboardPage() {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages]);
 
-  // Chat Submission Handler (transmits Persona style context)
+  // Chat Submission Handler
   const handleSendChat = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -161,7 +162,7 @@ export default function DashboardPage() {
         body: JSON.stringify({
           query: userText,
           emails, 
-          persona, // Pass selected persona style
+          persona, 
         }),
       });
 
@@ -352,6 +353,12 @@ export default function DashboardPage() {
 
   const confirmedSubscriptions = processedEmails.filter(e => e.insights.subscription?.name).map(e => ({ ...e.insights.subscription, emailSource: e }));
 
+  // Novel Feature: Intent-based Widget Mapping lists (resolving Informational Emails Missed)
+  const confirmedOpportunities = processedEmails.filter(e => e.insights.intent === 'Opportunity');
+  const confirmedSecurityAlerts = processedEmails.filter(e => e.insights.intent === 'Security Alert');
+  const confirmedUpdatesFeed = processedEmails.filter(e => e.insights.intent === 'Informational' || e.insights.intent === 'Financial Notice' || e.insights.intent === 'Reference Information');
+  const confirmedPersonalInsights = processedEmails.filter(e => e.insights.intent === 'Personal Communication');
+
   // Search Filter across confirmed items
   const matchesSearch = (text: string) => text.toLowerCase().includes(searchQuery.toLowerCase());
   
@@ -381,7 +388,6 @@ export default function DashboardPage() {
     if (persona === 'The Auditor') {
       return `System Status Audit: Reconciled ${emails.length} data streams. Found ${tasksCount} pending task risks requiring attention, ${deadlinesCount} upcoming deadlines, and ${trackingCount} courier cargo items. Financial indicators are verified.`;
     }
-    // Default: Executive Minimalist
     return `Charlie, you have ${tasksCount} pending tasks, ${deadlinesCount} deadlines this week, and ${trackingCount} package delivery arriving soon.`;
   };
 
@@ -738,7 +744,95 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 4. Orders & Shipment (Col Span: 4) */}
+          {/* Dynamic Intelligence Section (resolving Informational Emails Missed) */}
+          {/* 4. Opportunity Center */}
+          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, minHeight: 220 }}>
+            <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Award size={16} color="#3b82f6" /> Opportunity Center
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {confirmedOpportunities.length > 0 ? (
+                confirmedOpportunities.map((op, idx) => (
+                  <div key={idx} onClick={() => setSelectedItem(op)} style={{
+                    padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, cursor: 'pointer'
+                  }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff' }}>{op.subject}</div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                      {op.insights.dynamic_tags?.map((tag, i) => (
+                        <span key={i} style={{ fontSize: '0.62rem', background: 'rgba(59,130,246,0.1)', color: '#3b82f6', padding: '2px 6px', borderRadius: 4 }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Importance: {op.insights.importance || 50}%</span>
+                      <span>{new Date(op.dateSent).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>No active opportunities.</div>
+              )}
+            </div>
+          </div>
+
+          {/* 5. Security Center */}
+          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, minHeight: 220 }}>
+            <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <ShieldCheck size={16} color="#ef4444" /> Security Alerts
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {confirmedSecurityAlerts.length > 0 ? (
+                confirmedSecurityAlerts.map((sec, idx) => (
+                  <div key={idx} onClick={() => setSelectedItem(sec)} style={{
+                    padding: 12, background: 'rgba(239,68,68,0.02)', border: '1px solid rgba(239,68,68,0.12)', borderRadius: 10, cursor: 'pointer'
+                  }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#ef4444' }}>{sec.subject}</div>
+                    <p style={{ fontSize: '0.7rem', color: '#8899bb', marginTop: 4 }}>{sec.snippet}</p>
+                    <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Score: {sec.insights.importance || 80}%</span>
+                      <span>{new Date(sec.dateSent).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>No security alerts.</div>
+              )}
+            </div>
+          </div>
+
+          {/* 6. Updates Feed */}
+          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, minHeight: 220 }}>
+            <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <Newspaper size={16} color="#10b981" /> Updates Feed
+            </h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {confirmedUpdatesFeed.length > 0 ? (
+                confirmedUpdatesFeed.map((upd, idx) => (
+                  <div key={idx} onClick={() => setSelectedItem(upd)} style={{
+                    padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, cursor: 'pointer'
+                  }}>
+                    <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff' }}>{upd.subject}</div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 6 }}>
+                      {upd.insights.dynamic_tags?.map((tag, i) => (
+                        <span key={i} style={{ fontSize: '0.62rem', background: 'rgba(16,185,129,0.1)', color: '#10b981', padding: '2px 6px', borderRadius: 4 }}>
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 6, display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Importance: {upd.insights.importance || 50}%</span>
+                      <span>{new Date(upd.dateSent).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>No updates logged.</div>
+              )}
+            </div>
+          </div>
+
+          {/* 7. Orders & Shipment (Col Span: 4) */}
           <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Truck size={16} color="#10b981" /> Order tracking
@@ -767,7 +861,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 5. Finance Center (Col Span: 4) */}
+          {/* 8. Finance Center (Col Span: 4) */}
           <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <CreditCard size={16} color="#f43f5e" /> Finance Center
@@ -792,7 +886,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 6. Meetings & Schedule */}
+          {/* 9. Schedule & Agenda */}
           <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <Calendar size={16} color="#7c3aed" /> Schedule & Agenda
@@ -851,7 +945,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 7. Subscriptions Tracker (Col Span: 4) */}
+          {/* 10. Subscriptions Tracker (Col Span: 4) */}
           <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <RefreshCw size={16} color="#a855f7" /> Subscriptions
@@ -874,8 +968,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 8. Analytics & Trends (Col Span: 4) */}
-          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, height: 260 }}>
+          {/* 11. Analytics & Trends (Col Span: 8) */}
+          <div className="glass-card" style={{ gridColumn: 'span 8', padding: 20, height: 260 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <BarChart3 size={16} color="#00d4ff" /> Sync Analytics
             </h3>
@@ -898,7 +992,7 @@ export default function DashboardPage() {
 
         </div>
 
-        {/* Premium Detail Overlay Modal (With Novel Feature 1: One-Click AI Reply Draft Assistant) */}
+        {/* Premium Detail Overlay Modal */}
         <AnimatePresence>
           {selectedItem && (
             <div style={{
@@ -927,11 +1021,17 @@ export default function DashboardPage() {
                       </span>
                       <span style={{
                         fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: 99,
+                        color: '#00d4ff', background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.15)'
+                      }}>
+                        Importance: {selectedItem.insights.importance || 50}%
+                      </span>
+                      <span style={{
+                        fontSize: '0.65rem', fontWeight: 700, padding: '3px 8px', borderRadius: 99,
                         color: urgencyColors[selectedItem.insights.urgency] || '#8899bb',
                         background: `${urgencyColors[selectedItem.insights.urgency] || '#8899bb'}14`,
                         border: `1px solid ${urgencyColors[selectedItem.insights.urgency] || '#8899bb'}25`
                       }}>
-                        Priority Score: {selectedItem.insights.priorityScore || 50}
+                        Urgency: {selectedItem.insights.urgency}
                       </span>
                     </div>
                     <h2 style={{ fontFamily: 'Outfit,sans-serif', fontWeight: 700, fontSize: '1.2rem', color: '#f0f6ff', marginTop: 10 }}>
@@ -958,9 +1058,29 @@ export default function DashboardPage() {
                     </p>
                   </div>
 
-                  {/* Novel Feature 1: One-Click AI Reply Generator UI */}
+                  {/* Dynamic Tags & Entities */}
+                  {(selectedItem.insights.dynamic_tags || selectedItem.insights.entities) && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: '0 4px' }}>
+                      {selectedItem.insights.dynamic_tags && selectedItem.insights.dynamic_tags.length > 0 && (
+                        <div style={{ fontSize: '0.75rem', color: '#8899bb' }}>
+                          Context Tags: {selectedItem.insights.dynamic_tags.map((tag: string, i: number) => (
+                            <span key={i} style={{ margin: '0 4px', background: 'rgba(255,255,255,0.04)', padding: '2px 8px', borderRadius: 4, color: '#f0f6ff', fontSize: '0.68rem' }}>
+                              #{tag}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      {selectedItem.insights.entities && selectedItem.insights.entities.length > 0 && (
+                        <div style={{ fontSize: '0.75rem', color: '#8899bb' }}>
+                          Entities: <strong style={{ color: '#00d4ff' }}>{selectedItem.insights.entities.join(', ')}</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* One-Click AI Reply Generator UI */}
                   <div style={{ background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ fontSize: '0.78rem', color: '#7c3aed', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <Mail size={12} /> One-Click AI Draft Assistant
                       </div>

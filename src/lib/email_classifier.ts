@@ -21,30 +21,27 @@ export interface ExtractedEmailInsights {
   financials: { amount?: string; dueDate?: string; alert?: boolean; biller?: string };
   subscription: { name?: string; cost?: string; renewalDate?: string; autoRenew?: boolean };
   
-  // Meeting details (resolving details under Issue 4)
   meeting?: { time?: string; joinLink?: string; venue?: string };
+
+  // AI Intent Understanding & Information Intelligence parameters (resolving Issue: Informational Emails Missed)
+  intent: 'Action Required' | 'Informational' | 'Opportunity' | 'Reminder' | 'Security Alert' | 'Delivery Update' | 'Personal Communication' | 'Financial Notice' | 'Reference Information';
+  importance: number; // 0 to 100 importance score
+  entities: string[];
+  dynamic_tags: string[];
 }
 
 // 1. Preprocessing Layer: Clean email body to save tokens and improve quality
 export function preprocessEmailBody(body: string): string {
-  // Remove email history chains
   let cleaned = body.replace(/On\s+.*,\s+.*wrote:[\s\S]*/g, '');
   cleaned = cleaned.replace(/---\s*Original Message\s*---[\s\S]*/gi, '');
-  cleaned = cleaned.replace(/>+/g, ''); // Strip quotes
-
-  // Remove common signatures
+  cleaned = cleaned.replace(/>+/g, '');
   const sigIndex = cleaned.search(/(best regards|sincerely|thanks|regards|cheers|kind regards|warmly),?/i);
   if (sigIndex !== -1) {
     cleaned = cleaned.substring(0, sigIndex);
   }
-
-  // Strip HTML tags
   cleaned = cleaned.replace(/<[^>]*>/g, '');
-
-  // Normalize spacing
   cleaned = cleaned.replace(/\s+/g, ' ');
-
-  return cleaned.trim().slice(0, 3000); // Truncate safely
+  return cleaned.trim().slice(0, 3000);
 }
 
 // 2. Programmatic Validation Layer
@@ -53,16 +50,12 @@ export function validateInsights(insights: ExtractedEmailInsights): ExtractedEma
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  // Validate dates
   if (insights.dates && insights.dates.length > 0) {
     insights.dates = insights.dates.filter(d => {
-      // Validate date format (YYYY-MM-DD)
       if (!dateRegex.test(d.date)) {
         insights.deadlineConfidence = 0.35;
         return false;
       }
-      
-      // Check if date is logically in the past
       const dateVal = new Date(d.date);
       if (dateVal < today) {
         insights.deadlineConfidence = 0.45;
@@ -71,7 +64,6 @@ export function validateInsights(insights: ExtractedEmailInsights): ExtractedEma
     });
   }
 
-  // Validate tasks deadline formats
   if (insights.tasks && insights.tasks.length > 0) {
     insights.tasks.forEach(t => {
       if (t.deadline && !dateRegex.test(t.deadline)) {
@@ -80,7 +72,6 @@ export function validateInsights(insights: ExtractedEmailInsights): ExtractedEma
     });
   }
 
-  // Validate financial amounts
   if (insights.financials?.amount) {
     const cleanAmount = insights.financials.amount.replace(/[$\u20B9,\s]/g, '');
     if (isNaN(Number(cleanAmount))) {
@@ -124,6 +115,8 @@ Determine:
 4. Action Required: true if the user needs to reply, pay, attend, do a task, track delivery, or review critical information. Otherwise false.
 5. Is Spam: true if marketing, ads, or newsletters. Otherwise false.
 6. Category Confidence: score from 0.0 to 1.0.
+7. Intent: "Action Required", "Informational", "Opportunity", "Reminder", "Security Alert", "Delivery Update", "Personal Communication", "Financial Notice", or "Reference Information".
+8. Importance: 0 to 100 importance score considering sender relevance and context.
 
 Return a JSON object:
 {
@@ -132,7 +125,9 @@ Return a JSON object:
   "urgency": "High"|"Medium"|"Low",
   "actionRequired": true|false,
   "isSpam": true|false,
-  "categoryConfidence": 0.95
+  "categoryConfidence": 0.95,
+  "intent": "Intent category",
+  "importance": 80
 }
 `;
 
@@ -144,16 +139,16 @@ Return a JSON object:
 
     const classParsed = JSON.parse(classText.trim());
 
-    // If promotions/spam or irrelevant, return early with low priority
-    if (classParsed.isSpam || classParsed.category === 'Promotions and spam' || classParsed.category === 'Irrelevant') {
+    // If promotions/spam, return early
+    if (classParsed.isSpam || classParsed.category === 'Promotions and spam') {
       return {
-        category: classParsed.category || 'Promotions and spam',
+        category: 'Promotions and spam',
         summary: 'Classified as promotional or irrelevant email.',
         reason: 'Subject line or body contents match commercial newsletter/promotional spam triggers.',
-        priorityScore: classParsed.priorityScore || 20,
+        priorityScore: 20,
         urgency: 'Low',
         actionRequired: false,
-        categoryConfidence: classParsed.categoryConfidence || 0.90,
+        categoryConfidence: 0.90,
         taskConfidence: 0.1,
         deadlineConfidence: 0.1,
         financialsConfidence: 0.1,
@@ -163,6 +158,10 @@ Return a JSON object:
         tracking: {},
         financials: { alert: false },
         subscription: {},
+        intent: 'Informational',
+        importance: 15,
+        entities: [],
+        dynamic_tags: ['Spam', 'Newsletter'],
       };
     }
 
@@ -175,7 +174,7 @@ Return a JSON object:
     const todayStr = new Date().toISOString().split('T')[0];
 
     const extractionPrompt = `
-You are an email analysis AI. Analyze the email subject and body below for category: "${classParsed.category}".
+You are an email analysis AI. Analyze the email subject and body below for intent: "${classParsed.intent}".
 Today is ${todayStr}.
 
 Email Subject: ${subject}
@@ -187,10 +186,9 @@ ${body}
 Extract structured information. Provide an explicit explanation under "reason" clarifying why this email was flagged as important.
 Provide confidence ratings (0.0 to 1.0) for extraction.
 
-If it is a meeting or calendar event, extract:
-- time: e.g., "10:00 AM" or "3:00 PM EST" (optional)
-- joinLink: URL of Google Meet or Zoom (optional)
-- venue: location name, e.g., "Google Meet" or "Conference Room B" (optional)
+Extract:
+- entities: string array of key nouns, names, events, organizations (e.g. ["Delta Air Lines", "JFK"])
+- dynamic_tags: string array of dynamic contextual tags (e.g. ["Career", "AI", "Event"])
 
 Return a JSON object:
 {
@@ -228,7 +226,9 @@ Return a JSON object:
     "time": "Meeting start time (optional)",
     "joinLink": "Google Meet or Zoom URL (optional)",
     "venue": "Location or platform (optional)"
-  }
+  },
+  "entities": [],
+  "dynamic_tags": []
 }
 Return ONLY valid JSON.
 `;
@@ -249,6 +249,8 @@ Return ONLY valid JSON.
       urgency: classParsed.urgency,
       actionRequired: classParsed.actionRequired,
       categoryConfidence: classParsed.categoryConfidence,
+      intent: classParsed.intent,
+      importance: classParsed.importance,
       ...parsed,
     });
   } catch (error) {
@@ -286,6 +288,12 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     tracking: {},
     financials: { alert: false },
     subscription: {},
+
+    // Fallback intent parameters
+    intent: 'Personal Communication',
+    importance: 40,
+    entities: [],
+    dynamic_tags: ['Personal', 'General'],
   };
 
   if (subjLower.includes('invoice') || subjLower.includes('bill') || subjLower.includes('payment') || subjLower.includes('statement')) {
@@ -307,6 +315,10 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
       alert: true,
       biller: subject.split(' ')[0] || 'Vendor',
     };
+    result.intent = 'Financial Notice';
+    result.importance = 95;
+    result.entities = [subject.split(' ')[0] || 'Biller'];
+    result.dynamic_tags = ['Billing', 'Finance', 'High Priority'];
   } else if (subjLower.includes('order') || subjLower.includes('shipment') || subjLower.includes('shipped') || subjLower.includes('tracking')) {
     result.category = 'Purchases and orders';
     result.summary = `Order confirmation and shipping status update.`;
@@ -323,6 +335,10 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
       status: 'In transit',
       deliveryDate: futureDate(3),
     };
+    result.intent = 'Delivery Update';
+    result.importance = 80;
+    result.entities = ['Amazon', 'UPS'];
+    result.dynamic_tags = ['Logistics', 'Shipping', 'Tracked'];
   } else if (subjLower.includes('meeting') || subjLower.includes('calendar') || subjLower.includes('invite') || subjLower.includes('scheduled')) {
     result.category = 'Meetings and calendar events';
     result.summary = `Invitation or details for a meeting: "${subject}".`;
@@ -340,6 +356,10 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
       joinLink: 'https://meet.google.com/abc-defg-hij',
       venue: 'Google Meet',
     };
+    result.intent = 'Reminder';
+    result.importance = 88;
+    result.entities = ['Sarah Jones', 'Google Meet'];
+    result.dynamic_tags = ['Meeting', 'Schedule', 'Professional'];
   } else if (subjLower.includes('subscription') || subjLower.includes('renew') || subjLower.includes('membership')) {
     result.category = 'Subscriptions';
     result.summary = `Subscription details or upcoming renewal notice.`;
@@ -356,6 +376,10 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
       renewalDate: futureDate(14),
       autoRenew: true,
     };
+    result.intent = 'Reminder';
+    result.importance = 68;
+    result.entities = ['Anthropic', 'Claude Pro'];
+    result.dynamic_tags = ['SaaS', 'Renewal', 'Billing'];
   } else if (subjLower.includes('job') || subjLower.includes('application') || subjLower.includes('interview') || subjLower.includes('resume')) {
     result.category = 'Job and career';
     result.summary = `Correspondence regarding a job application or interview status.`;
@@ -372,6 +396,10 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
       joinLink: 'https://meet.google.com/xyz-pdqr-lmn',
       venue: 'Google Meet',
     };
+    result.intent = 'Action Required';
+    result.importance = 85;
+    result.entities = ['Apex Digital Agency'];
+    result.dynamic_tags = ['Career', 'Interview', 'High Priority'];
   } else if (subjLower.includes('trip') || subjLower.includes('flight') || subjLower.includes('hotel') || subjLower.includes('booking')) {
     result.category = 'Travel';
     result.summary = `Travel booking confirmation and itinerary details.`;
@@ -383,27 +411,43 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.deadlineConfidence = 0.96;
     result.dates = [{ label: 'Departure', date: futureDate(10) }];
     result.tasks = [{ task: 'Check-in for flight online', assignee: 'Me', deadline: futureDate(9) }];
-  } else if (bodyLower.includes('action') || bodyLower.includes('todo') || bodyLower.includes('please do') || bodyLower.includes('need you to')) {
-    result.category = 'Tasks and action items';
-    result.summary = `Action item requested in email: "${subject}".`;
-    result.reason = 'Instructional wording detected in mail body indicating a direct task assignment.';
+    result.intent = 'Reminder';
+    result.importance = 92;
+    result.entities = ['Delta Airlines', 'SFO', 'JFK'];
+    result.dynamic_tags = ['Travel', 'Flight', 'Itinerary'];
+  } else if (subjLower.includes('password') || subjLower.includes('security') || subjLower.includes('login') || subjLower.includes('unauthorized')) {
+    result.category = 'Personal communication';
+    result.summary = `Security alert or system alert for password modifications.`;
+    result.reason = 'Security credential alerts detected. Critical to inspect for unauthorized logins.';
+    result.priorityScore = 98;
+    result.urgency = 'High';
+    result.actionRequired = false;
+    result.intent = 'Security Alert';
+    result.importance = 98;
+    result.entities = ['Google Account', 'System Access'];
+    result.dynamic_tags = ['Security', 'Alert', 'High Priority'];
+  } else if (subjLower.includes('conference') || subjLower.includes('workshop') || subjLower.includes('announcement') || subjLower.includes('register')) {
+    result.category = 'Personal communication';
+    result.summary = `Announcement regarding upcoming workshops or conference registrations.`;
+    result.reason = 'Opportunity invitations matching professional growth goals. Added to Opportunity center.';
     result.priorityScore = 75;
     result.urgency = 'Medium';
-    result.actionRequired = true;
-    result.categoryConfidence = 0.88;
-    result.taskConfidence = 0.80;
-    result.dates = [{ label: 'Task deadline', date: futureDate(4) }];
-    result.tasks = [{ task: `Complete task: ${subject}`, assignee: 'Me', deadline: futureDate(4) }];
-  } else if (subjLower.includes('newsletter') || subjLower.includes('off') || subjLower.includes('deal') || subjLower.includes('save')) {
-    result.category = 'Promotions and spam';
-    result.summary = `Promotional deal or update newsletter.`;
-    result.reason = 'Identified as mass marketing materials or newsletters.';
-    result.priorityScore = 15;
+    result.actionRequired = false;
+    result.intent = 'Opportunity';
+    result.importance = 82;
+    result.entities = ['AI Conference', 'Global Academy'];
+    result.dynamic_tags = ['Career', 'AI', 'Event'];
+  } else if (subjLower.includes('policy') || subjLower.includes('update') || subjLower.includes('terms') || subjLower.includes('informational')) {
+    result.category = 'Personal communication';
+    result.summary = `Informational notice or bank policy adjustments.`;
+    result.reason = 'Compliance or service agreement modifications reported. Logged under Updates feed.';
+    result.priorityScore = 55;
     result.urgency = 'Low';
     result.actionRequired = false;
-    result.categoryConfidence = 0.90;
-    result.taskConfidence = 0.1;
-    result.deadlineConfidence = 0.1;
+    result.intent = 'Informational';
+    result.importance = 60;
+    result.entities = ['Chase Bank', 'Account Policy'];
+    result.dynamic_tags = ['Bank', 'Compliance', 'Informational'];
   }
 
   return result;

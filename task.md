@@ -1,6 +1,6 @@
-# Task List: AI Draft Assistant & Command Personas
+# Task List: Intent Understanding & Dynamic Intelligence
 
-- `[ ]` Refactor: Create Draft Reply Generator API handler (`src/app/api/draft/route.ts`)
-- `[ ]` Refactor: Pass Persona state to Memory Vault Chat backend (`src/app/api/chat/route.ts`)
-- `[ ]` Refactor: Implement Persona layouts, widget ordering, and Draft Response triggers in Dashboard UI (`src/app/dashboard/page.tsx`)
+- `[ ]` Refactor: Update AI classifier schema and prompt with intent, importance, entities, and dynamic tags (`src/lib/email_classifier.ts`)
+- `[ ]` Refactor: Update Mock Emails database with informational, opportunity, and security events (`src/lib/mock_emails.ts`)
+- `[ ]` Refactor: Add Opportunity Center, Security Center, and Updates Feed widgets to Dashboard (`src/app/dashboard/page.tsx`)
 - `[ ]` Verification: Verify Next.js production compilation (`npm run build`)
