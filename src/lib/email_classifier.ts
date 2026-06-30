@@ -4,10 +4,17 @@ export interface ExtractedEmailInsights {
   category: string;
   summary: string;
   reason: string;
-  priorityScore: number; // 0 to 100 (resolving Issue 3)
-  urgency: 'High' | 'Medium' | 'Low'; // urgency tag (resolving Issue 3)
-  actionRequired: boolean; // intent tracking (resolving Issue 3)
-  confidence: number; // Score from 0.0 to 1.0
+  priorityScore: number;
+  urgency: 'High' | 'Medium' | 'Low';
+  actionRequired: boolean;
+  
+  // Granular Confidence Parameters (resolving Issue 4)
+  categoryConfidence: number;
+  taskConfidence: number;
+  deadlineConfidence: number;
+  financialsConfidence: number;
+  trackingConfidence: number;
+
   dates: { label: string; date: string }[];
   tasks: { task: string; assignee: string; deadline: string }[];
   tracking: { provider?: string; trackingNumber?: string; status?: string; deliveryDate?: string };
@@ -37,7 +44,51 @@ export function preprocessEmailBody(body: string): string {
   return cleaned.trim().slice(0, 3000); // Truncate safely
 }
 
-// 2. Main Classification + Extraction Separator
+// 2. Programmatic Validation Layer (resolving Issue 4)
+export function validateInsights(insights: ExtractedEmailInsights): ExtractedEmailInsights {
+  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Validate dates
+  if (insights.dates && insights.dates.length > 0) {
+    insights.dates = insights.dates.filter(d => {
+      // Validate date format (YYYY-MM-DD)
+      if (!dateRegex.test(d.date)) {
+        insights.deadlineConfidence = 0.35; // Lower confidence dramatically if invalid format
+        return false;
+      }
+      
+      // Check if date is logically in the past (e.g. past deadlines cannot be auto-added)
+      const dateVal = new Date(d.date);
+      if (dateVal < today) {
+        insights.deadlineConfidence = 0.45; // Flag date in past
+      }
+      return true;
+    });
+  }
+
+  // Validate tasks deadline formats
+  if (insights.tasks && insights.tasks.length > 0) {
+    insights.tasks.forEach(t => {
+      if (t.deadline && !dateRegex.test(t.deadline)) {
+        insights.taskConfidence = Math.min(insights.taskConfidence, 0.5);
+      }
+    });
+  }
+
+  // Validate financial amounts
+  if (insights.financials?.amount) {
+    const cleanAmount = insights.financials.amount.replace(/[$\u20B9,\s]/g, '');
+    if (isNaN(Number(cleanAmount))) {
+      insights.financialsConfidence = Math.min(insights.financialsConfidence, 0.5); // Flag corrupt currency formats
+    }
+  }
+
+  return insights;
+}
+
+// 3. Main Classification + Extraction Separator
 export async function classifyEmailAndExtractInsights(
   subject: string,
   rawBody: string,
@@ -46,7 +97,7 @@ export async function classifyEmailAndExtractInsights(
   const body = preprocessEmailBody(rawBody);
 
   if (!apiKey || !apiKey.trim() || apiKey === 'mock-key') {
-    return runMockClassifier(subject, body);
+    return validateInsights(runMockClassifier(subject, body));
   }
 
   try {
@@ -69,6 +120,7 @@ Determine:
 3. Urgency: "High", "Medium", or "Low".
 4. Action Required: true if the user needs to reply, pay, attend, do a task, track delivery, or review critical information. Otherwise false.
 5. Is Spam: true if marketing, ads, or newsletters. Otherwise false.
+6. Category Confidence: score from 0.0 to 1.0.
 
 Return a JSON object:
 {
@@ -76,7 +128,8 @@ Return a JSON object:
   "priorityScore": 85,
   "urgency": "High"|"Medium"|"Low",
   "actionRequired": true|false,
-  "isSpam": true|false
+  "isSpam": true|false,
+  "categoryConfidence": 0.95
 }
 `;
 
@@ -97,7 +150,11 @@ Return a JSON object:
         priorityScore: classParsed.priorityScore || 20,
         urgency: 'Low',
         actionRequired: false,
-        confidence: 0.90,
+        categoryConfidence: classParsed.categoryConfidence || 0.90,
+        taskConfidence: 0.1,
+        deadlineConfidence: 0.1,
+        financialsConfidence: 0.1,
+        trackingConfidence: 0.1,
         dates: [],
         tasks: [],
         tracking: {},
@@ -124,14 +181,21 @@ Email Body:
 ${body}
 """
 
-Extract structured information. Provide an explicit explanation under "reason" clarifying why this email was flagged as important (e.g. "Payment-related content detected due in 2 days").
-Assign a confidence score (0.0 to 1.0) on how reliable this extraction is.
+Extract structured information. Provide an explicit explanation under "reason" clarifying why this email was flagged as important.
+Provide confidence ratings (0.0 to 1.0) for:
+- taskConfidence: how certain you are of tasks extracted
+- deadlineConfidence: how certain you are of dates/deadlines extracted
+- financialsConfidence: how certain you are of biller/cost parameters extracted
+- trackingConfidence: how certain you are of shipping tracking parameters extracted
 
 Return a JSON object:
 {
   "summary": "Brief 1-2 sentence summary of the email",
   "reason": "Clear explanation of priority/relevance for the user",
-  "confidence": 0.95,
+  "taskConfidence": 0.95,
+  "deadlineConfidence": 0.92,
+  "financialsConfidence": 0.98,
+  "trackingConfidence": 0.90,
   "dates": [
     { "label": "e.g. Payment due, Flight departure", "date": "YYYY-MM-DD" }
   ],
@@ -168,16 +232,19 @@ Return ONLY valid JSON.
     if (text.endsWith('```')) text = text.substring(0, text.length - 3);
 
     const parsed = JSON.parse(text.trim());
-    return {
+    
+    // Apply Programmatic Validation Layer on output
+    return validateInsights({
       category: classParsed.category,
       priorityScore: classParsed.priorityScore,
       urgency: classParsed.urgency,
       actionRequired: classParsed.actionRequired,
+      categoryConfidence: classParsed.categoryConfidence,
       ...parsed,
-    };
+    });
   } catch (error) {
     console.error('Error in two-stage Gemini processing, falling back:', error);
-    return runMockClassifier(subject, body);
+    return validateInsights(runMockClassifier(subject, body));
   }
 }
 
@@ -197,7 +264,14 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     priorityScore: 30,
     urgency: 'Low',
     actionRequired: false,
-    confidence: 0.95,
+    
+    // Granular Confidences
+    categoryConfidence: 0.95,
+    taskConfidence: 0.80,
+    deadlineConfidence: 0.85,
+    financialsConfidence: 0.90,
+    trackingConfidence: 0.80,
+
     dates: [],
     tasks: [],
     tracking: {},
@@ -212,7 +286,10 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.priorityScore = 95;
     result.urgency = 'High';
     result.actionRequired = true;
-    result.confidence = 0.98;
+    result.categoryConfidence = 0.98;
+    result.taskConfidence = 0.95;
+    result.deadlineConfidence = 0.96;
+    result.financialsConfidence = 0.98;
     result.dates = [{ label: 'Payment due date', date: futureDate(5) }];
     result.tasks = [{ task: `Pay outstanding bill for ${subject}`, assignee: 'Me', deadline: futureDate(5) }];
     result.financials = {
@@ -228,7 +305,8 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.priorityScore = 80;
     result.urgency = 'Medium';
     result.actionRequired = true;
-    result.confidence = 0.94;
+    result.categoryConfidence = 0.96;
+    result.trackingConfidence = 0.94;
     result.dates = [{ label: 'Estimated delivery', date: futureDate(3) }];
     result.tracking = {
       provider: 'UPS',
@@ -243,7 +321,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.priorityScore = 85;
     result.urgency = 'High';
     result.actionRequired = true;
-    result.confidence = 0.88;
+    result.categoryConfidence = 0.94;
+    result.taskConfidence = 0.92;
+    result.deadlineConfidence = 0.94;
     result.dates = [{ label: 'Meeting date', date: futureDate(1) }];
     result.tasks = [{ task: `Attend meeting: ${subject}`, assignee: 'Me', deadline: futureDate(1) }];
   } else if (subjLower.includes('subscription') || subjLower.includes('renew') || subjLower.includes('membership')) {
@@ -253,7 +333,8 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.priorityScore = 65;
     result.urgency = 'Medium';
     result.actionRequired = true;
-    result.confidence = 0.92;
+    result.categoryConfidence = 0.92;
+    result.financialsConfidence = 0.92;
     result.dates = [{ label: 'Renewal date', date: futureDate(14) }];
     result.subscription = {
       name: subject.replace(/subscription|renew|membership/gi, '').trim() || 'Software Service',
@@ -268,7 +349,8 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.priorityScore = 78;
     result.urgency = 'Medium';
     result.actionRequired = true;
-    result.confidence = 0.85;
+    result.categoryConfidence = 0.90;
+    result.taskConfidence = 0.85;
     result.dates = [{ label: 'Interview appointment', date: futureDate(2) }];
     result.tasks = [{ task: 'Prepare portfolio and review interview questions', assignee: 'Me', deadline: futureDate(2) }];
   } else if (subjLower.includes('trip') || subjLower.includes('flight') || subjLower.includes('hotel') || subjLower.includes('booking')) {
@@ -278,7 +360,8 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.priorityScore = 90;
     result.urgency = 'High';
     result.actionRequired = true;
-    result.confidence = 0.96;
+    result.categoryConfidence = 0.96;
+    result.deadlineConfidence = 0.96;
     result.dates = [{ label: 'Departure', date: futureDate(10) }];
     result.tasks = [{ task: 'Check-in for flight online', assignee: 'Me', deadline: futureDate(9) }];
   } else if (bodyLower.includes('action') || bodyLower.includes('todo') || bodyLower.includes('please do') || bodyLower.includes('need you to')) {
@@ -288,7 +371,8 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.priorityScore = 75;
     result.urgency = 'Medium';
     result.actionRequired = true;
-    result.confidence = 0.76;
+    result.categoryConfidence = 0.88;
+    result.taskConfidence = 0.80;
     result.dates = [{ label: 'Task deadline', date: futureDate(4) }];
     result.tasks = [{ task: `Complete task: ${subject}`, assignee: 'Me', deadline: futureDate(4) }];
   } else if (subjLower.includes('newsletter') || subjLower.includes('off') || subjLower.includes('deal') || subjLower.includes('save')) {
@@ -298,7 +382,9 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     result.priorityScore = 15;
     result.urgency = 'Low';
     result.actionRequired = false;
-    result.confidence = 0.45;
+    result.categoryConfidence = 0.90;
+    result.taskConfidence = 0.1;
+    result.deadlineConfidence = 0.1;
   }
 
   return result;

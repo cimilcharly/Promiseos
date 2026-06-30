@@ -183,16 +183,23 @@ export default function DashboardPage() {
     showToast(action === 'approved' ? '✅ Insight approved and added.' : '❌ Insight rejected.', 'info');
   };
 
-  // 1. Process Confidence Gating
+  // 1. Process Confidence Gating using Granular Confidence Parameters
   const suggestedInsights: any[] = [];
   const processedEmails = emails.filter(email => {
     const feedback = feedbacks[email.id];
     // If user manually rejected, exclude it
     if (feedback === 'rejected') return false;
 
-    const confidence = email.insights.confidence || 0.9;
+    // Use aggregate confidence (average of active confidences)
+    const categoryConf = email.insights.categoryConfidence ?? 0.9;
+    const taskConf = email.insights.taskConfidence ?? 0.9;
+    const deadlineConf = email.insights.deadlineConfidence ?? 0.9;
+    const financialConf = email.insights.financialsConfidence ?? 0.9;
+    const trackingConf = email.insights.trackingConfidence ?? 0.9;
     
-    // Gating ranges
+    const confidence = (categoryConf + taskConf + deadlineConf + financialConf + trackingConf) / 5;
+    
+    // Gating ranges (resolving Issue 4)
     if (confidence < 0.7) {
       return false; // Filter out completely
     }
@@ -370,7 +377,7 @@ export default function DashboardPage() {
                   }}>
                     <div style={{ fontSize: '0.8rem', color: '#f0f6ff' }}>
                       <strong>{item.insights.category}:</strong> {item.insights.summary}{' '}
-                      <span style={{ color: '#f59e0b', fontSize: '0.72rem', marginLeft: 6 }}>(Confidence: {Math.round((item.insights.confidence || 0.8) * 100)}%)</span>
+                      <span style={{ color: '#f59e0b', fontSize: '0.72rem', marginLeft: 6 }}>(Confidence: {Math.round((item.insights.categoryConfidence || 0.8) * 100)}%)</span>
                     </div>
                     <div style={{ display: 'flex', gap: 8 }}>
                       <button
@@ -725,6 +732,19 @@ export default function DashboardPage() {
                     <p style={{ fontSize: '0.82rem', color: '#8899bb', lineHeight: 1.5 }}>
                       {selectedItem.insights.summary}
                     </p>
+                  </div>
+
+                  {/* AI Explainability & Confidence Metrics (resolving Issue 4) */}
+                  <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    <div style={{ fontSize: '0.78rem', color: '#00d4ff', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <Sparkles size={12} /> AI Extraction Confidence Ratings
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 16px', fontSize: '0.75rem', color: '#8899bb' }}>
+                      <div>Intent Category: <strong style={{ color: '#f0f6ff' }}>{Math.round((selectedItem.insights.categoryConfidence || 0.9) * 100)}%</strong></div>
+                      <div>Action Tasks: <strong style={{ color: '#f0f6ff' }}>{Math.round((selectedItem.insights.taskConfidence || 0.9) * 100)}%</strong></div>
+                      <div>Dates & Deadlines: <strong style={{ color: '#f0f6ff' }}>{Math.round((selectedItem.insights.deadlineConfidence || 0.9) * 100)}%</strong></div>
+                      <div>Financials/Bills: <strong style={{ color: '#f0f6ff' }}>{Math.round((selectedItem.insights.financialsConfidence || 0.9) * 100)}%</strong></div>
+                    </div>
                   </div>
 
                   {/* AI Explainability / Reasoning Box */}

@@ -1,7 +1,6 @@
-# Task List: AI Relevance & Intent Detection Pipeline
+# Task List: Granular Confidence Scoring & Validation Layer
 
-- `[ ]` Refactor: Update AI Classifier with Intent Classification & Priority scoring (`src/lib/email_classifier.ts`)
-- `[ ]` Refactor: Update Mock Emails database with priority/urgency attributes (`src/lib/mock_emails.ts`)
-- `[ ]` Refactor: Remove keyword limits from sync-emails Gmail API call (`src/app/api/sync-emails/route.ts`)
-- `[ ]` Refactor: Display priority indicators and urgency tags on Dashboard cards (`src/app/dashboard/page.tsx`)
+- `[ ]` Refactor: Update AI classifier output schema with granular confidence scores and validation logic (`src/lib/email_classifier.ts`)
+- `[ ]` Refactor: Update Mock Emails database with granular confidence ratings (`src/lib/mock_emails.ts`)
+- `[ ]` Refactor: Display granular confidence statistics in Dashboard detail drawers (`src/app/dashboard/page.tsx`)
 - `[ ]` Verification: Verify Next.js production compilation (`npm run build`)
