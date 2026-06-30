@@ -8,6 +8,8 @@ export async function POST(request: NextRequest) {
   try {
     const { userId, googleAccessToken, consents } = await request.json();
 
+    const activeToken = googleAccessToken || request.cookies.get('google_access_token')?.value;
+
     const geminiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
 
     // Supabase server client
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
     }
 
     // If no Google Access Token or Gmail Consent is denied, return mock emails (Demo mode behavior)
-    if (!googleAccessToken || !consents?.gmailAccess) {
+    if (!activeToken || !consents?.gmailAccess) {
       console.log('Sync-emails falling back to mock dataset (no token or consent denied)');
       const mockList = getMockEmails();
       return NextResponse.json({
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
     );
 
     oauth2Client.setCredentials({
-      access_token: googleAccessToken,
+      access_token: activeToken,
     });
 
     const gmailClient = google.gmail({ version: 'v1', auth: oauth2Client });
