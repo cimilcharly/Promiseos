@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export interface ExtractedEmailInsights {
   category: string;
   summary: string;
+  confidence: number; // Score from 0.0 to 1.0
   dates: { label: string; date: string }[];
   tasks: { task: string; assignee: string; deadline: string }[];
   tracking: { provider?: string; trackingNumber?: string; status?: string; deliveryDate?: string };
@@ -10,47 +11,92 @@ export interface ExtractedEmailInsights {
   subscription: { name?: string; cost?: string; renewalDate?: string; autoRenew?: boolean };
 }
 
+// 1. Preprocessing Layer: Clean email body to save tokens and improve quality
+export function preprocessEmailBody(body: string): string {
+  // Remove email history chains
+  let cleaned = body.replace(/On\s+.*,\s+.*wrote:[\s\S]*/g, '');
+  cleaned = cleaned.replace(/---\s*Original Message\s*---[\s\S]*/gi, '');
+  cleaned = cleaned.replace(/>+/g, ''); // Strip quotes
+
+  // Remove common signatures
+  const sigIndex = cleaned.search(/(best regards|sincerely|thanks|regards|cheers|kind regards|warmly),?/i);
+  if (sigIndex !== -1) {
+    cleaned = cleaned.substring(0, sigIndex);
+  }
+
+  // Strip HTML tags
+  cleaned = cleaned.replace(/<[^>]*>/g, '');
+
+  // Normalize spacing
+  cleaned = cleaned.replace(/\s+/g, ' ');
+
+  return cleaned.trim().slice(0, 3000); // Truncate safely
+}
+
+// 2. Main Classification + Extraction Separator
 export async function classifyEmailAndExtractInsights(
   subject: string,
-  body: string,
+  rawBody: string,
   apiKey: string | null
 ): Promise<ExtractedEmailInsights> {
+  const body = preprocessEmailBody(rawBody);
+
   if (!apiKey || !apiKey.trim() || apiKey === 'mock-key') {
     return runMockClassifier(subject, body);
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({
+    
+    // Stage 1: Classify Relevance and Category
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+    const classificationPrompt = `
+Analyze this email and classify it into one of these categories:
+- "Finance / bills"
+- "Job and career"
+- "Meetings and calendar events"
+- "Purchases and orders"
+- "Travel"
+- "Subscriptions"
+- "Personal communication"
+- "Promotions and spam"
+- "Tasks and action items"
+- "Deadlines and reminders"
+- "Irrelevant"
+
+Email Subject: ${subject}
+Email Body: ${body.slice(0, 1000)}
+
+Respond with ONLY the category string. No explanation or formatting.
+`;
+
+    const classificationResult = await model.generateContent(classificationPrompt);
+    const category = classificationResult.response.text().trim().replace(/['"]/g, '');
+
+    // If promotions/spam or irrelevant, return early with low confidence
+    if (category === 'Promotions and spam' || category === 'Irrelevant') {
+      return {
+        category,
+        summary: 'Classified as promotional or irrelevant email.',
+        confidence: 0.35,
+        dates: [],
+        tasks: [],
+        tracking: {},
+        financials: { alert: false },
+        subscription: {},
+      };
+    }
+
+    // Stage 2: Detailed Extraction
+    const extractionModel = genAI.getGenerativeModel({
       model: 'gemini-2.0-flash',
-      generationConfig: {
-        responseMimeType: 'application/json',
-      },
+      generationConfig: { responseMimeType: 'application/json' },
     });
 
     const todayStr = new Date().toISOString().split('T')[0];
 
-    const prompt = `
-You are an email analysis AI. Analyze the email subject and body below.
-1. Categorize the email into exactly one of these categories:
-   - "Finance / bills"
-   - "Job and career"
-   - "Meetings and calendar events"
-   - "Purchases and orders"
-   - "Travel"
-   - "Subscriptions"
-   - "Personal communication"
-   - "Promotions and spam"
-   - "Tasks and action items"
-   - "Deadlines and reminders"
-
-2. Generate a 1-2 sentence summary of the email.
-3. Extract important dates mentioned (e.g. deadlines, flights, meetings).
-4. Extract tasks or actions required from the recipient.
-5. If the email contains a shipment/order, extract shipment tracking details.
-6. If the email contains a bill/invoice, extract financial details and set alert to true.
-7. If the email is about a subscription signup or renewal, extract subscription information.
-
+    const extractionPrompt = `
+You are an email analysis AI. Analyze the email subject and body below for category: "${category}".
 Today is ${todayStr}.
 
 Email Subject: ${subject}
@@ -59,54 +105,53 @@ Email Body:
 ${body}
 """
 
-Return a JSON object with the exact schema:
+Extract structured information. Assign a confidence score (0.0 to 1.0) on how reliable this extraction is.
+Return a JSON object:
 {
-  "category": "One of the categories listed above",
-  "summary": "Brief 1-2 sentence summary",
+  "summary": "Brief 1-2 sentence summary of the email",
+  "confidence": 0.95,
   "dates": [
-    { "label": "Description of the date (e.g., Flight departure, Payment due)", "date": "YYYY-MM-DD" }
+    { "label": "e.g. Payment due, Flight departure", "date": "YYYY-MM-DD" }
   ],
   "tasks": [
-    { "task": "Actionable task", "assignee": "Person responsible (usually 'Me')", "deadline": "YYYY-MM-DD or relative" }
+    { "task": "Actionable task", "assignee": "Person responsible (usually 'Me')", "deadline": "YYYY-MM-DD" }
   ],
   "tracking": {
-    "provider": "e.g. UPS, FedEx, DHL, Amazon (optional)",
+    "provider": "UPS|FedEx|DHL|Amazon (optional)",
     "trackingNumber": "tracking string (optional)",
-    "status": "e.g. Shipped, Out for delivery, Delivered (optional)",
+    "status": "Shipped|In transit|Delivered (optional)",
     "deliveryDate": "YYYY-MM-DD (optional)"
   },
   "financials": {
-    "amount": "Amount due e.g., $150.00 (optional)",
+    "amount": "e.g., $150.00 (optional)",
     "dueDate": "YYYY-MM-DD (optional)",
     "alert": true|false,
-    "biller": "Name of service/entity billing (optional)"
+    "biller": "Biller name (optional)"
   },
   "subscription": {
-    "name": "Name of service (optional)",
-    "cost": "e.g. $14.99/month (optional)",
+    "name": "Service name (optional)",
+    "cost": "e.g., $10/mo (optional)",
     "renewalDate": "YYYY-MM-DD (optional)",
     "autoRenew": true|false
   }
 }
-Ensure you ONLY return the valid JSON object. Do not include markdown code block formatting in your output, just raw JSON.
+Return ONLY valid JSON.
 `;
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
+    const extractionResult = await extractionModel.generateContent(extractionPrompt);
+    let text = extractionResult.response.text().trim();
 
-    let cleanText = text;
-    if (cleanText.startsWith('```json')) {
-      cleanText = cleanText.substring(7);
-    } else if (cleanText.startsWith('```')) {
-      cleanText = cleanText.substring(3);
-    }
-    if (cleanText.endsWith('```')) {
-      cleanText = cleanText.substring(0, cleanText.length - 3);
-    }
+    if (text.startsWith('```json')) text = text.substring(7);
+    if (text.startsWith('```')) text = text.substring(3);
+    if (text.endsWith('```')) text = text.substring(0, text.length - 3);
 
-    return JSON.parse(cleanText.trim()) as ExtractedEmailInsights;
+    const parsed = JSON.parse(text.trim());
+    return {
+      category,
+      ...parsed,
+    };
   } catch (error) {
-    console.error('Error in real Gemini email classification:', error);
+    console.error('Error in two-stage Gemini processing, falling back:', error);
     return runMockClassifier(subject, body);
   }
 }
@@ -120,10 +165,10 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
     return d.toISOString().split('T')[0];
   };
 
-  // Default fallback
   const result: ExtractedEmailInsights = {
     category: 'Personal communication',
     summary: `An email regarding "${subject}".`,
+    confidence: 0.95,
     dates: [],
     tasks: [],
     tracking: {},
@@ -134,6 +179,7 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
   if (subjLower.includes('invoice') || subjLower.includes('bill') || subjLower.includes('payment') || subjLower.includes('statement')) {
     result.category = 'Finance / bills';
     result.summary = `Invoice or billing statement received for ${subject}.`;
+    result.confidence = 0.98;
     result.dates = [{ label: 'Payment due date', date: futureDate(5) }];
     result.tasks = [{ task: `Pay outstanding bill for ${subject}`, assignee: 'Me', deadline: futureDate(5) }];
     result.financials = {
@@ -145,6 +191,7 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
   } else if (subjLower.includes('order') || subjLower.includes('shipment') || subjLower.includes('shipped') || subjLower.includes('tracking')) {
     result.category = 'Purchases and orders';
     result.summary = `Order confirmation and shipping status update.`;
+    result.confidence = 0.94;
     result.dates = [{ label: 'Estimated delivery', date: futureDate(3) }];
     result.tracking = {
       provider: 'UPS',
@@ -155,11 +202,13 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
   } else if (subjLower.includes('meeting') || subjLower.includes('calendar') || subjLower.includes('invite') || subjLower.includes('scheduled')) {
     result.category = 'Meetings and calendar events';
     result.summary = `Invitation or details for a meeting: "${subject}".`;
+    result.confidence = 0.88;
     result.dates = [{ label: 'Meeting date', date: futureDate(1) }];
     result.tasks = [{ task: `Attend meeting: ${subject}`, assignee: 'Me', deadline: futureDate(1) }];
   } else if (subjLower.includes('subscription') || subjLower.includes('renew') || subjLower.includes('membership')) {
     result.category = 'Subscriptions';
     result.summary = `Subscription details or upcoming renewal notice.`;
+    result.confidence = 0.92;
     result.dates = [{ label: 'Renewal date', date: futureDate(14) }];
     result.subscription = {
       name: subject.replace(/subscription|renew|membership/gi, '').trim() || 'Software Service',
@@ -170,21 +219,25 @@ function runMockClassifier(subject: string, body: string): ExtractedEmailInsight
   } else if (subjLower.includes('job') || subjLower.includes('application') || subjLower.includes('interview') || subjLower.includes('resume')) {
     result.category = 'Job and career';
     result.summary = `Correspondence regarding a job application or interview status.`;
+    result.confidence = 0.85;
     result.dates = [{ label: 'Interview appointment', date: futureDate(2) }];
     result.tasks = [{ task: 'Prepare portfolio and review interview questions', assignee: 'Me', deadline: futureDate(2) }];
   } else if (subjLower.includes('trip') || subjLower.includes('flight') || subjLower.includes('hotel') || subjLower.includes('booking')) {
     result.category = 'Travel';
     result.summary = `Travel booking confirmation and itinerary details.`;
+    result.confidence = 0.96;
     result.dates = [{ label: 'Departure', date: futureDate(10) }];
     result.tasks = [{ task: 'Check-in for flight online', assignee: 'Me', deadline: futureDate(9) }];
   } else if (bodyLower.includes('action') || bodyLower.includes('todo') || bodyLower.includes('please do') || bodyLower.includes('need you to')) {
     result.category = 'Tasks and action items';
     result.summary = `Action item requested in email: "${subject}".`;
+    result.confidence = 0.76;
     result.dates = [{ label: 'Task deadline', date: futureDate(4) }];
     result.tasks = [{ task: `Complete task: ${subject}`, assignee: 'Me', deadline: futureDate(4) }];
   } else if (subjLower.includes('newsletter') || subjLower.includes('off') || subjLower.includes('deal') || subjLower.includes('save')) {
     result.category = 'Promotions and spam';
     result.summary = `Promotional deal or update newsletter.`;
+    result.confidence = 0.45;
   }
 
   return result;

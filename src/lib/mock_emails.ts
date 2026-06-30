@@ -33,6 +33,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Finance / bills',
         summary: 'Monthly Vercel team plan invoice generated. $40.00 will be auto-charged on July 5, 2026.',
+        confidence: 0.98,
         dates: [
           { label: 'Payment Due Date', date: dateOffset(5).split('T')[0] }
         ],
@@ -61,6 +62,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Purchases and orders',
         summary: 'Your Keychron K2 Mechanical Keyboard has shipped via UPS. Estimated delivery is tomorrow.',
+        confidence: 0.95,
         dates: [
           { label: 'Estimated Delivery Date', date: dateOffset(1).split('T')[0] }
         ],
@@ -87,6 +89,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Meetings and calendar events',
         summary: 'Roadmap review meeting scheduled with Sarah Jones on Thursday, July 2, 2026, at 3:00 PM EST.',
+        confidence: 0.94,
         dates: [
           { label: 'Meeting Date', date: dateOffset(2).split('T')[0] }
         ],
@@ -109,7 +112,8 @@ export function getMockEmails(): MockEmail[] {
       dateSent: dateOffset(-1),
       insights: {
         category: 'Tasks and action items',
-        summary: 'Charlie needs to update express-jwt package dependencies in git and deploy to staging by Friday to patch a security vulnerability.',
+        summary: 'Charlie needs to update express-jwt package dependencies in git and deploy to staging by Friday.',
+        confidence: 0.84, // Sugggested - Review gate required
         dates: [
           { label: 'Vulnerability patch deadline', date: dateOffset(3).split('T')[0] }
         ],
@@ -134,6 +138,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Subscriptions',
         summary: 'Claude Pro subscription is renewing on July 14, 2026. $20.00 will be auto-charged.',
+        confidence: 0.81, // Suggested - Review gate required
         dates: [
           { label: 'Subscription Renewal Date', date: dateOffset(14).split('T')[0] }
         ],
@@ -160,6 +165,7 @@ export function getMockEmails(): MockEmail[] {
       insights: {
         category: 'Travel',
         summary: 'Delta Flight DL142 from SFO to JFK confirmed for July 10, 2026. Depart at 8:30 AM, seat 12C.',
+        confidence: 0.96,
         dates: [
           { label: 'Flight Departure Date', date: dateOffset(10).split('T')[0] }
         ],

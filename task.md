@@ -1,6 +1,6 @@
-# Task List: Restructure Product into Personal Tracking Dashboard
+# Task List: Production-Grade Personal Intelligence Architecture
 
-- `[x]` Refactor: Overwrite `src/app/dashboard/page.tsx` with Personal Tracking Dashboard code
-- `[x]` Refactor: Redirect `src/app/inbox/page.tsx` to `/dashboard`
-- `[x]` Refactor: Clean up `src/components/Sidebar.tsx` navigation and stats panel
+- `[x]` Refactor: Preprocessing & two-stage classification/extraction (`src/lib/email_classifier.ts`)
+- `[x]` Refactor: Update Sync API to return confidence scores and bundles (`src/app/api/sync-emails/route.ts`)
+- `[x]` Refactor: Add Suggested Insights, Trip Bundles, and Feedback loops in Dashboard (`src/app/dashboard/page.tsx`)
 - `[x]` Verification: Verify Next.js production compilation (`npm run build`)

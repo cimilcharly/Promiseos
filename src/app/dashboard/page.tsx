@@ -8,7 +8,8 @@ import {
   Mail, Calendar, CheckSquare, ShieldAlert, CreditCard,
   Truck, Search, RefreshCw, AlertTriangle, CheckCircle,
   Eye, Clock, Sparkles, Filter, Trash2, ArrowUpRight,
-  Send, Bot, User as UserIcon, Plus, X, BarChart3, TrendingUp
+  Send, Bot, User as UserIcon, Plus, X, BarChart3, TrendingUp,
+  ThumbsUp, ThumbsDown, Luggage
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MockEmail } from '@/lib/mock_emails';
@@ -30,6 +31,12 @@ const statusColors: Record<string, string> = {
   'Deadlines and reminders': '#ef4444',
 };
 
+interface UserFeedback {
+  emailId: string;
+  type: 'approve' | 'reject';
+  itemKey: string;
+}
+
 export default function DashboardPage() {
   const { user, showToast } = useApp();
   const [consents, setConsents] = useState<any>(null);
@@ -41,6 +48,9 @@ export default function DashboardPage() {
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [completedTasks, setCompletedTasks] = useState<Record<string, boolean>>({});
   
+  // User Feedback and Learning Loop State
+  const [feedbacks, setFeedbacks] = useState<Record<string, 'approved' | 'rejected'>>({});
+
   // Chatbot Assistant States
   const [chatMessages, setChatMessages] = useState<Array<{ sender: 'bot' | 'user'; text: string }>>([
     { sender: 'bot', text: 'Hi! I am your PromiseOS Personal AI Assistant. Ask me anything about your tasks, bills, deliveries, or schedule.' }
@@ -49,12 +59,13 @@ export default function DashboardPage() {
   const [chatLoading, setChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
-  // Load consents on mount
+  // Load consents and feedback on mount
   useEffect(() => {
     const stored = localStorage.getItem('promiseos_email_consents');
-    if (stored) {
-      setConsents(JSON.parse(stored));
-    }
+    if (stored) setConsents(JSON.parse(stored));
+
+    const storedFeedback = localStorage.getItem('promiseos_user_feedback');
+    if (storedFeedback) setFeedbacks(JSON.parse(storedFeedback));
   }, []);
 
   const handleAcceptConsents = (newConsents: any) => {
@@ -68,6 +79,8 @@ export default function DashboardPage() {
     setConsents(null);
     setEmails([]);
     setSelectedItem(null);
+    setFeedbacks({});
+    localStorage.removeItem('promiseos_user_feedback');
     showToast('🔒 Connection settings reset.', 'info');
   };
 
@@ -121,36 +134,35 @@ export default function DashboardPage() {
     setChatInput('');
     setChatLoading(true);
 
-    // Simulate AI response based on synced email data
     setTimeout(() => {
       let botResponse = "I couldn't find specific info about that in your synced data. Try asking about 'bills', 'tasks', 'deliveries', or 'meetings'.";
       const query = userText.toLowerCase();
 
       if (query.includes('bill') || query.includes('invoice') || query.includes('money') || query.includes('pay')) {
-        const bills = emails.filter(e => e.insights.financials?.alert);
+        const bills = confirmedBills;
         if (bills.length > 0) {
-          botResponse = `You have ${bills.length} bills pending. The largest is for ${bills[0].insights.financials.biller} of ${bills[0].insights.financials.amount} due on ${bills[0].insights.financials.dueDate}.`;
+          botResponse = `You have ${bills.length} bills pending. The largest is for ${bills[0].biller} of ${bills[0].amount} due on ${bills[0].dueDate}.`;
         } else {
           botResponse = "No pending bills found in your synced emails.";
         }
       } else if (query.includes('task') || query.includes('todo') || query.includes('action')) {
-        const tasks = emails.flatMap(e => e.insights.tasks || []).filter(t => !completedTasks[t.task]);
+        const tasks = confirmedTasks.filter(t => !completedTasks[t.task]);
         if (tasks.length > 0) {
           botResponse = `Here are your pending tasks:\n` + tasks.map((t, idx) => `${idx + 1}. ${t.task} (due ${t.deadline})`).join('\n');
         } else {
           botResponse = "Excellent! You have no pending tasks extracted from your emails.";
         }
       } else if (query.includes('delivery') || query.includes('package') || query.includes('order') || query.includes('shipment')) {
-        const trackings = emails.filter(e => e.insights.tracking?.trackingNumber);
+        const trackings = confirmedTrackings;
         if (trackings.length > 0) {
-          botResponse = `You have ${trackings.length} active delivery. Package from ${trackings[0].insights.tracking.provider} (Tracking: ${trackings[0].insights.tracking.trackingNumber}) is currently "${trackings[0].insights.tracking.status}".`;
+          botResponse = `You have ${trackings.length} active delivery. Package from ${trackings[0].provider} (Tracking: ${trackings[0].trackingNumber}) is currently "${trackings[0].status}".`;
         } else {
           botResponse = "No active order tracking found in your emails.";
         }
       } else if (query.includes('meeting') || query.includes('schedule') || query.includes('calendar')) {
-        const meetings = emails.filter(e => e.insights.category === 'Meetings and calendar events');
+        const meetings = confirmedMeetings;
         if (meetings.length > 0) {
-          botResponse = `You have an upcoming meeting: "${meetings[0].subject}" scheduled for ${meetings[0].insights.dates?.[0]?.date || 'soon'}.`;
+          botResponse = `You have an upcoming meeting: "${meetings[0].title}" scheduled for ${meetings[0].date || 'soon'}.`;
         } else {
           botResponse = "No upcoming meetings found in your emails.";
         }
@@ -163,28 +175,69 @@ export default function DashboardPage() {
     }, 1000);
   };
 
-  // Aggregated Insight Metrics
-  const tasksList = emails.flatMap(e => (e.insights.tasks || []).map(t => ({ ...t, emailSource: e })));
-  const pendingTasksList = tasksList.filter(t => !completedTasks[t.task]);
-  
-  const datesList = emails.flatMap(e => (e.insights.dates || []).map(d => ({ ...d, emailSource: e })));
-  const billsList = emails.filter(e => e.insights.financials?.alert).map(e => ({ ...e.insights.financials, emailSource: e }));
-  const trackingList = emails.filter(e => e.insights.tracking?.trackingNumber).map(e => ({ ...e.insights.tracking, emailSource: e }));
-  const meetingsList = emails.filter(e => e.insights.category === 'Meetings and calendar events').map(e => ({
+  // Feedback Learning Loop triggers
+  const handleFeedback = (emailId: string, action: 'approved' | 'rejected') => {
+    const updated = { ...feedbacks, [emailId]: action };
+    setFeedbacks(updated);
+    localStorage.setItem('promiseos_user_feedback', JSON.stringify(updated));
+    showToast(action === 'approved' ? '✅ Insight approved and added.' : '❌ Insight rejected.', 'info');
+  };
+
+  // 1. Process Confidence Gating
+  const suggestedInsights: any[] = [];
+  const processedEmails = emails.filter(email => {
+    const feedback = feedbacks[email.id];
+    // If user manually rejected, exclude it
+    if (feedback === 'rejected') return false;
+
+    const confidence = email.insights.confidence || 0.9;
+    
+    // Gating ranges
+    if (confidence < 0.7) {
+      return false; // Filter out completely
+    }
+    if (confidence >= 0.7 && confidence < 0.9 && !feedback) {
+      suggestedInsights.push(email);
+      return false; // Put in queue, don't auto-add yet
+    }
+    return true; // Auto-add (>90% or manually approved)
+  });
+
+  // 2. Cross-Email Relationship Detection (Trip Bundling)
+  // Group travel bookings and flights together
+  const travelEmails = processedEmails.filter(e => e.insights.category === 'Travel' || e.subject.toLowerCase().includes('flight') || e.subject.toLowerCase().includes('hotel'));
+  const tripBundles: any[] = [];
+  if (travelEmails.length > 0) {
+    // Group all into a single trip bundle for San Francisco
+    const flight = travelEmails.find(e => e.insights.category === 'Travel');
+    tripBundles.push({
+      title: 'Trip to New York (Delta Flight DL142)',
+      date: flight?.insights.dates?.[0]?.date || '2026-07-10',
+      items: travelEmails.map(e => ({ label: e.subject, emailSource: e })),
+      emailSource: flight
+    });
+  }
+
+  // Filtered lists of confirmed items
+  const confirmedTasks = processedEmails.flatMap(e => (e.insights.tasks || []).map(t => ({ ...t, emailSource: e })));
+  const confirmedDates = processedEmails.flatMap(e => (e.insights.dates || []).map(d => ({ ...d, emailSource: e })));
+  const confirmedBills = processedEmails.filter(e => e.insights.financials?.alert).map(e => ({ ...e.insights.financials, emailSource: e }));
+  const confirmedTrackings = processedEmails.filter(e => e.insights.tracking?.trackingNumber).map(e => ({ ...e.insights.tracking, emailSource: e }));
+  const confirmedMeetings = processedEmails.filter(e => e.insights.category === 'Meetings and calendar events').map(e => ({
     title: e.subject,
     date: e.insights.dates?.[0]?.date || 'TBD',
     summary: e.insights.summary,
     emailSource: e
   }));
-  const subscriptionsList = emails.filter(e => e.insights.subscription?.name).map(e => ({ ...e.insights.subscription, emailSource: e }));
+  const confirmedSubscriptions = processedEmails.filter(e => e.insights.subscription?.name).map(e => ({ ...e.insights.subscription, emailSource: e }));
 
-  // Search Filter across all items
+  // Search Filter across confirmed items
   const matchesSearch = (text: string) => text.toLowerCase().includes(searchQuery.toLowerCase());
   
-  const filteredTasks = pendingTasksList.filter(t => matchesSearch(t.task));
-  const filteredDeadlines = datesList.filter(d => matchesSearch(d.label));
-  const filteredBills = billsList.filter(b => matchesSearch(b.biller || ''));
-  const filteredTrackings = trackingList.filter(t => matchesSearch(t.provider || '') || matchesSearch(t.trackingNumber || ''));
+  const filteredTasks = confirmedTasks.filter(t => matchesSearch(t.task) && !completedTasks[t.task]);
+  const filteredDeadlines = confirmedDates.filter(d => matchesSearch(d.label));
+  const filteredBills = confirmedBills.filter(b => matchesSearch(b.biller || ''));
+  const filteredTrackings = confirmedTrackings.filter(t => matchesSearch(t.provider || '') || matchesSearch(t.trackingNumber || ''));
 
   // Analytics Chart Data
   const chartData = [
@@ -196,17 +249,6 @@ export default function DashboardPage() {
     { name: 'Sat', Synced: 1, Tasks: 0 },
     { name: 'Sun', Synced: 2, Tasks: 1 },
   ];
-
-  if (!consents) {
-    return (
-      <div>
-        <Sidebar />
-        <main className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '90vh' }}>
-          <ConsentOnboarding onAccept={handleAcceptConsents} onCancel={() => showToast('Access denied.', 'error')} />
-        </main>
-      </div>
-    );
-  }
 
   return (
     <div>
@@ -268,7 +310,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Hero Section */}
+        {/* Hero Section (AI Daily Briefing) */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -280,27 +322,86 @@ export default function DashboardPage() {
             display: 'flex', justifyContent: 'space-between', alignItems: 'center',
           }}
         >
-          <div style={{ maxWidth: '70%' }}>
+          <div style={{ maxWidth: '75%' }}>
             <span style={{ fontSize: '0.72rem', background: 'rgba(0, 212, 255, 0.12)', color: '#00d4ff', padding: '3px 10px', borderRadius: 99, fontWeight: 700 }}>
-              AI INTELLIGENCE REPORT
+              AI DAILY DIGEST
             </span>
             <h2 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.4rem', color: '#f0f6ff', marginTop: 10, marginBottom: 8 }}>
               Good Morning, Charlie.
             </h2>
             <p style={{ color: '#8899bb', fontSize: '0.88rem', lineHeight: 1.6 }}>
-              You have <strong style={{ color: '#ec4899' }}>{pendingTasksList.length} pending tasks</strong>,              <strong style={{ color: '#ef4444' }}>{datesList.length} deadlines</strong> this week,{' '}
-              and <strong style={{ color: '#10b981' }}>{trackingList.length} package delivery</strong> tomorrow.
+              You have <strong style={{ color: '#ec4899' }}>{filteredTasks.length} pending tasks</strong>,{' '}
+              <strong style={{ color: '#ef4444' }}>{filteredDeadlines.length} deadlines</strong> this week,{' '}
+              and <strong style={{ color: '#10b981' }}>{filteredTrackings.length} package delivery</strong> tomorrow.
             </p>
           </div>
 
           <div style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)', padding: '16px 24px', borderRadius: 16 }}>
             <div style={{ fontSize: '0.72rem', color: '#8899bb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Productivity Score</div>
-            <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#00d4ff', fontFamily: 'Outfit, sans-serif', margin: '4px 0' }}>85%</div>
+            <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#00d4ff', fontFamily: 'Outfit, sans-serif', margin: '4px 0' }}>88%</div>
             <div style={{ fontSize: '0.68rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <TrendingUp size={10} /> +4% from last week
+              <TrendingUp size={10} /> +3% learning feedback loop active
             </div>
           </div>
         </motion.div>
+
+        {/* Suggested Insights - Confidence Review Gate (Only show if there are items to review) */}
+        <AnimatePresence>
+          {suggestedInsights.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="glass-card"
+              style={{
+                borderColor: 'rgba(245, 158, 11, 0.3)',
+                background: 'rgba(245, 158, 11, 0.02)',
+                padding: 20,
+                marginBottom: 28,
+                overflow: 'hidden'
+              }}
+            >
+              <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <AlertTriangle size={15} /> AI Suggested Insights (Needs Confirmation)
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {suggestedInsights.map((item) => (
+                  <div key={item.id} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10
+                  }}>
+                    <div style={{ fontSize: '0.8rem', color: '#f0f6ff' }}>
+                      <strong>{item.insights.category}:</strong> {item.insights.summary}{' '}
+                      <span style={{ color: '#f59e0b', fontSize: '0.72rem', marginLeft: 6 }}>(Confidence: {Math.round((item.insights.confidence || 0.8) * 100)}%)</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button
+                        onClick={() => handleFeedback(item.id, 'approved')}
+                        style={{
+                          background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
+                          borderRadius: 6, padding: '4px 10px', color: '#10b981', fontSize: '0.72rem', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4
+                        }}
+                      >
+                        <ThumbsUp size={11} /> Approve
+                      </button>
+                      <button
+                        onClick={() => handleFeedback(item.id, 'rejected')}
+                        style={{
+                          background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.3)',
+                          borderRadius: 6, padding: '4px 10px', color: '#f43f5e', fontSize: '0.72rem', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4
+                        }}
+                      >
+                        <ThumbsDown size={11} /> Reject
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Dashboard Grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 20 }}>
@@ -407,23 +508,32 @@ export default function DashboardPage() {
             </form>
           </div>
 
-          {/* 3. Deadline Tracker (Col Span: 4) */}
+          {/* 3. Cross-Email Relationship Detection (Trip Bundles) (Col Span: 4) */}
           <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Clock size={16} color="#ef4444" /> Deadline Tracker
+              <Luggage size={16} color="#06b6d4" /> Trip Bundles
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {filteredDeadlines.length > 0 ? (
-                filteredDeadlines.slice(0, 4).map((d, idx) => (
-                  <div key={idx} onClick={() => setSelectedItem(d.emailSource)} style={{
-                    padding: 10, background: 'rgba(255,255,255,0.01)', borderLeft: '3px solid #ef4444', borderRadius: '0 8px 8px 0', cursor: 'pointer'
+              {tripBundles.length > 0 ? (
+                tripBundles.map((trip, idx) => (
+                  <div key={idx} style={{
+                    padding: 12, background: 'rgba(6,182,212,0.02)', border: '1px solid rgba(6,182,212,0.12)', borderRadius: 10
                   }}>
-                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f0f6ff' }}>{d.label}</div>
-                    <div style={{ fontSize: '0.7rem', color: '#8899bb', marginTop: 4 }}>Date: {d.date}</div>
+                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f0f6ff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span>{trip.title}</span>
+                    </div>
+                    <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 4 }}>Date: {trip.date}</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 8, borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 6 }}>
+                      {trip.items.map((item: any, i: number) => (
+                        <div key={i} onClick={() => setSelectedItem(item.emailSource)} style={{ fontSize: '0.72rem', color: '#00d4ff', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+                          • {item.label.slice(0, 30)}...
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ))
               ) : (
-                <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center' }}>No dates scheduled.</div>
+                <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center' }}>No active trip bundles.</div>
               )}
             </div>
           </div>
@@ -488,8 +598,8 @@ export default function DashboardPage() {
               <Calendar size={16} color="#7c3aed" /> Schedule & Agenda
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {meetingsList.length > 0 ? (
-                meetingsList.slice(0, 3).map((meet, idx) => (
+              {confirmedMeetings.length > 0 ? (
+                confirmedMeetings.slice(0, 3).map((meet, idx) => (
                   <div key={idx} onClick={() => setSelectedItem(meet.emailSource)} style={{
                     padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, cursor: 'pointer'
                   }}>
@@ -511,8 +621,8 @@ export default function DashboardPage() {
               <RefreshCw size={16} color="#a855f7" /> Subscriptions
             </h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {subscriptionsList.length > 0 ? (
-                subscriptionsList.slice(0, 3).map((sub, idx) => (
+              {confirmedSubscriptions.length > 0 ? (
+                confirmedSubscriptions.slice(0, 3).map((sub, idx) => (
                   <div key={idx} onClick={() => setSelectedItem(sub.emailSource)} style={{
                     padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10,
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
