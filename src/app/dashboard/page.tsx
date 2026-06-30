@@ -409,6 +409,14 @@ export default function DashboardPage() {
     { name: 'Sun', Synced: 2, Tasks: 1 },
   ];
 
+  if (!consents) {
+    return (
+      <div style={{ display: 'flex', minHeight: '100vh', background: '#080d1a', alignItems: 'center', justifyContent: 'center', color: '#f0f6ff' }}>
+        <ConsentOnboarding onAccept={handleAcceptConsents} onCancel={() => showToast('🔒 Sync disabled by user.', 'info')} />
+      </div>
+    );
+  }
+
   return (
     <div>
       <Sidebar />
