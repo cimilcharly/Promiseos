@@ -34,3 +34,8 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Voice Features & Whisper Setup
+PromiseOS supports advanced voice synthesis and transcription features:
+1. **AI-Synthesized Voice Briefings:** Text-to-speech engine on the dashboard reading daily briefings.
+2. **AI Voice Dictation (Whisper):** Clicking the microphone button in the chatbot records your voice and transcribes it via OpenAI's Whisper model (requires `OPENAI_API_KEY` configured in `.env.local` or Vercel Environment Variables). Runs browser `webkitSpeechRecognition` as a fallback.
