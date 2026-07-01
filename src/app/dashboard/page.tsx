@@ -67,6 +67,10 @@ export default function DashboardPage() {
   const [isRecordingTask, setIsRecordingTask] = useState(false);
   const taskMediaRecorderRef = useRef<MediaRecorder | null>(null);
   const taskAudioChunksRef = useRef<Blob[]>([]);
+  const [draftInstructions, setDraftInstructions] = useState('');
+  const [isRecordingDraft, setIsRecordingDraft] = useState(false);
+  const draftMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const draftAudioChunksRef = useRef<Blob[]>([]);
   
   // Interactive Command Persona State
   const [persona, setPersona] = useState<'Executive Minimalist' | 'The Motivator' | 'The Auditor'>('Executive Minimalist');
@@ -439,6 +443,105 @@ export default function DashboardPage() {
     }
   };
 
+  const fallbackSpeechRecognitionDraft = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('⚠️ Speech recognition not supported in this browser.', 'error');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsRecordingDraft(true);
+      showToast('🎙️ Dictating draft instructions (local speech)...', 'info');
+    };
+
+    recognition.onresult = (event: any) => {
+      const speechToText = event.results[0][0].transcript;
+      setDraftInstructions(speechToText);
+      showToast('🎙️ Draft instructions transcribed!', 'success');
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error', event.error);
+      setIsRecordingDraft(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecordingDraft(false);
+    };
+
+    recognition.start();
+  };
+
+  const startRecordingDraft = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      draftMediaRecorderRef.current = mediaRecorder;
+      draftAudioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          draftAudioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(draftAudioChunksRef.current, { type: 'audio/webm' });
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', audioBlob, 'audio.webm');
+
+          const response = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const data = await response.json();
+          if (data.text) {
+            setDraftInstructions(data.text);
+            showToast('🎙️ Draft instructions transcribed via Whisper!', 'success');
+          } else {
+            throw new Error(data.error || 'Whisper transcription failed');
+          }
+        } catch (err: any) {
+          console.warn('Whisper fallback triggered for draft:', err);
+          fallbackSpeechRecognitionDraft();
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecordingDraft(true);
+      showToast('🎙️ Recording instructions for Whisper...', 'info');
+    } catch (err) {
+      console.warn('Microphone stream access error for draft, using local transcription:', err);
+      fallbackSpeechRecognitionDraft();
+    }
+  };
+
+  const stopRecordingDraft = () => {
+    if (draftMediaRecorderRef.current && isRecordingDraft) {
+      draftMediaRecorderRef.current.stop();
+      draftMediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecordingDraft(false);
+    }
+  };
+
+  const toggleRecordingDraft = () => {
+    if (isRecordingDraft) {
+      stopRecordingDraft();
+    } else {
+      startRecordingDraft();
+    }
+  };
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('promiseos_custom_tasks');
@@ -507,7 +610,7 @@ export default function DashboardPage() {
   };
 
   // Feature 1: One-Click AI Reply Draft handler
-  const handleGenerateDraft = async (subject: string, body: string, isCompleted: boolean) => {
+  const handleGenerateDraft = async (subject: string, body: string, isCompleted: boolean, customInstructions?: string) => {
     setDraftLoading(true);
     setDraftText('');
     try {
@@ -518,7 +621,8 @@ export default function DashboardPage() {
           subject,
           body,
           taskStatus: isCompleted ? 'completed' : 'pending',
-          persona
+          persona,
+          customInstructions
         })
       });
 
@@ -2078,7 +2182,7 @@ export default function DashboardPage() {
                         <Mail size={12} /> One-Click AI Draft Assistant
                       </div>
                       <button
-                        onClick={() => handleGenerateDraft(selectedItem.subject, selectedItem.body, Object.keys(completedTasks).length > 0)}
+                        onClick={() => handleGenerateDraft(selectedItem.subject, selectedItem.body, Object.keys(completedTasks).length > 0, draftInstructions)}
                         disabled={draftLoading}
                         style={{
                           background: '#7c3aed', border: 'none', borderRadius: 6, padding: '4px 10px', color: '#fff', fontSize: '0.68rem', cursor: 'pointer'
@@ -2086,6 +2190,31 @@ export default function DashboardPage() {
                       >
                         {draftLoading ? 'Generating...' : 'Draft Response'}
                       </button>
+                    </div>
+
+                    {/* Custom Prompts & Voice Dictation for Draft */}
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', background: 'rgba(0,0,0,0.1)', padding: 6, borderRadius: 8 }}>
+                      <button
+                        type="button"
+                        onClick={toggleRecordingDraft}
+                        style={{
+                          background: isRecordingDraft ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.02)',
+                          border: isRecordingDraft ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.06)',
+                          borderRadius: 6, width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          color: isRecordingDraft ? '#f43f5e' : '#8899bb', cursor: 'pointer', transition: 'all 0.2s', outline: 'none'
+                        }}
+                        title={isRecordingDraft ? 'Stop Recording' : 'Voice Dictate Reply Instructions'}
+                      >
+                        {isRecordingDraft ? <MicOff size={12} className="animate-pulse" /> : <Mic size={12} />}
+                      </button>
+                      <input
+                        className="input-field"
+                        type="text"
+                        placeholder={isRecordingDraft ? 'Listening...' : 'Reply instructions (e.g. reschedule to next Monday)...'}
+                        value={draftInstructions}
+                        onChange={e => setDraftInstructions(e.target.value)}
+                        style={{ fontSize: '0.72rem', borderRadius: 6, background: 'transparent', border: 'none', padding: '2px 6px', flex: 1, outline: 'none' }}
+                      />
                     </div>
 
                     {draftText && (
