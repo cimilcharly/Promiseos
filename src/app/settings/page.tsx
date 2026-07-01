@@ -556,7 +556,7 @@ function SettingsContent() {
               { name: 'Slack', icon: '💬', status: 'V2 Roadmap', color: '#8899bb' },
               { name: 'Gmail', icon: '📧', status: 'V4 Roadmap', color: '#4a5a7a' },
               { name: 'Resend Email', icon: '📨', status: 'Active', color: '#10b981' },
-              { name: 'MCP Server', icon: '🔗', status: 'V4 Roadmap', color: '#7c3aed' },
+              { name: 'MCP Server', icon: '🔗', status: 'Active', color: '#10b981' },
             ].map((item, i) => (
               <motion.div
                 key={item.name}
@@ -583,6 +583,93 @@ function SettingsContent() {
                 </span>
               </motion.div>
             ))}
+          </Section>
+
+          {/* MCP Integration Center */}
+          <Section title="MCP Integration Center" icon={<Cpu size={18} />} delay={0.65}>
+            <p style={{ fontSize: '0.82rem', color: '#8899bb', marginBottom: 16, lineHeight: 1.6 }}>
+              Connect PromiseOS directly to your local AI applications (like Claude Desktop or Cursor Code Editor) to query and create tasks headlessly.
+            </p>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+              <div style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10, padding: 14 }}>
+                <div style={{ fontSize: '0.78rem', color: '#00d4ff', fontWeight: 700, marginBottom: 8 }}>Your Endpoint URL</div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    readOnly
+                    value={typeof window !== 'undefined' ? `${window.location.origin}/api/mcp` : '/api/mcp'}
+                    style={{ flex: 1, fontSize: '0.75rem', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 6, padding: '6px 10px', color: '#f0f6ff' }}
+                  />
+                  <button
+                    onClick={() => {
+                      if (typeof window !== 'undefined') {
+                        navigator.clipboard.writeText(`${window.location.origin}/api/mcp`);
+                        showToast('📋 Endpoint URL copied!', 'success');
+                      }
+                    }}
+                    className="btn-secondary"
+                    style={{ fontSize: '0.72rem', padding: '6px 12px', borderRadius: 6 }}
+                  >
+                    Copy
+                  </button>
+                </div>
+              </div>
+
+              {/* Installers */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: '0.78rem', color: '#f0f6ff', fontWeight: 600, marginBottom: 4 }}>Windows Auto Setup</div>
+                  <p style={{ fontSize: '0.68rem', color: '#8899bb', marginBottom: 12, lineHeight: 1.4 }}>Downloads a script that configures Claude Desktop automatically.</p>
+                  <button
+                    onClick={() => {
+                      if (typeof window === 'undefined') return;
+                      const serverUrl = `${window.location.origin}/api/mcp`;
+                      const scriptText = `@echo off\r\necho Configuring PromiseOS MCP Server in Claude Desktop...\r\nset CONFIG_DIR=%APPDATA%\\Claude\r\nset CONFIG_FILE=%CONFIG_DIR%\\claude_desktop_config.json\r\nif not exist "%CONFIG_DIR%" mkdir "%CONFIG_DIR%"\r\npowershell -Command "$file = '%CONFIG_FILE%'; $url = '${serverUrl}'; if (Test-Path $file) { $json = Get-Content $file -Raw | ConvertFrom-Json } else { $json = [PSCustomObject]@{ mcpServers = [PSCustomObject]@{} } }; if (-not $json.mcpServers) { $json | Add-Member -MemberType NoteProperty -Name mcpServers -Value ([PSCustomObject]@{}) }; $json.mcpServers | Add-Member -MemberType NoteProperty -Name 'promiseos' -Value ([PSCustomObject]@{ url = $url }) -Force; $json | ConvertTo-Json -Depth 10 | Set-Content $file"\r\necho Done! Restart Claude Desktop to use PromiseOS.\r\npause\r\n`;
+                      const blob = new Blob([scriptText], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'setup_promiseos_mcp.bat';
+                      a.click();
+                      showToast('📥 Downloaded setup_promiseos_mcp.bat!', 'success');
+                    }}
+                    className="btn-primary"
+                    style={{ width: '100%', fontSize: '0.72rem', padding: '6px 0', borderRadius: 6 }}
+                  >
+                    Download .bat Script
+                  </button>
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, padding: 14 }}>
+                  <div style={{ fontSize: '0.78rem', color: '#f0f6ff', fontWeight: 600, marginBottom: 4 }}>macOS Auto Setup</div>
+                  <p style={{ fontSize: '0.68rem', color: '#8899bb', marginBottom: 12, lineHeight: 1.4 }}>Downloads a shell script to configure Claude Desktop automatically.</p>
+                  <button
+                    onClick={() => {
+                      if (typeof window === 'undefined') return;
+                      const serverUrl = `${window.location.origin}/api/mcp`;
+                      const scriptText = `#!/bin/bash\necho "Configuring PromiseOS MCP Server..."\nCONFIG_DIR="$HOME/Library/Application Support/Claude"\nCONFIG_FILE="$CONFIG_DIR/claude_desktop_config.json"\nmkdir -p "$CONFIG_DIR"\nif [ -f "$CONFIG_FILE" ]; then\n  python3 -c "import json, os; f = '$CONFIG_FILE'; data = json.load(open(f)) if os.path.exists(f) else {}; data.setdefault('mcpServers', {})['promiseos'] = {'url': '${serverUrl}'}; json.dump(data, open(f, 'w'), indent=2)"\nelse\n  echo '{"mcpServers": {"promiseos": {"url": "${serverUrl}"}}}' > "$CONFIG_FILE"\nfi\necho "Done! Restart Claude Desktop."\n`;
+                      const blob = new Blob([scriptText], { type: 'text/plain' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = 'setup_promiseos_mcp.sh';
+                      a.click();
+                      showToast('📥 Downloaded setup_promiseos_mcp.sh!', 'success');
+                    }}
+                    className="btn-primary"
+                    style={{ width: '100%', fontSize: '0.72rem', padding: '6px 0', borderRadius: 6 }}
+                  >
+                    Download .sh Script
+                  </button>
+                </div>
+              </div>
+
+              {/* Note */}
+              <div style={{ background: 'rgba(239, 68, 68, 0.04)', border: '1px solid rgba(239, 68, 68, 0.15)', borderRadius: 8, padding: 12, fontSize: '0.7rem', color: '#8899bb', lineHeight: 1.4 }}>
+                ⚠️ <strong>Note:</strong> Standard web-based <code>claude.ai</code> does not support custom MCP server connections yet. To utilize this interface, please configure it inside the **Claude Desktop App**, **Cursor**, or **Windsurf**.
+              </div>
+            </div>
           </Section>
 
           {/* Save button */}
