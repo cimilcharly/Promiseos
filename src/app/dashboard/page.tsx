@@ -10,7 +10,7 @@ import {
   Eye, Clock, Sparkles, Filter, Trash2, ArrowUpRight,
   Send, Bot, User as UserIcon, Plus, X, BarChart3, TrendingUp,
   ThumbsUp, ThumbsDown, Luggage, Layers, Video, PlusCircle, Copy,
-  Award, ShieldCheck, Newspaper, Play, Pause, Network, Volume2
+  Award, ShieldCheck, Newspaper, Play, Pause, Network, Volume2, Mic, MicOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MockEmail } from '@/lib/mock_emails';
@@ -59,6 +59,9 @@ export default function DashboardPage() {
   const [activeScheduleTab, setActiveScheduleTab] = useState<'meetings' | 'deadlines'>('meetings');
   const [activeView, setActiveView] = useState<'command-center' | 'knowledge-graph' | 'escalation-runway'>('command-center');
   const [isPlayingBrief, setIsPlayingBrief] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   
   // Interactive Command Persona State
   const [persona, setPersona] = useState<'Executive Minimalist' | 'The Motivator' | 'The Auditor'>('Executive Minimalist');
@@ -206,6 +209,110 @@ export default function DashboardPage() {
       setIsPlayingBrief(true);
       window.speechSynthesis.speak(utterance);
       showToast('🔊 Playing synthesized AI voice briefing...', 'success');
+    }
+  };
+
+  const fallbackSpeechRecognition = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('⚠️ Speech recognition not supported in this browser.', 'error');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsRecording(true);
+      showToast('🎙️ Dictating (using local browser speech recognition)...', 'info');
+    };
+
+    recognition.onresult = (event: any) => {
+      const speechToText = event.results[0][0].transcript;
+      setChatInput(speechToText);
+      showToast('🎙️ Voice input transcribed!', 'success');
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error', event.error);
+      showToast('⚠️ Local speech recognition error: ' + event.error, 'error');
+      setIsRecording(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecording(false);
+    };
+
+    recognition.start();
+  };
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', audioBlob, 'audio.webm');
+
+          const response = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const data = await response.json();
+          if (data.text) {
+            setChatInput(data.text);
+            showToast('🎙️ OpenAI Whisper transcription successful!', 'success');
+          } else if (data.error && data.error.includes('key not configured')) {
+            showToast('💡 OpenAI key missing. Falling back to local speech recognition...', 'info');
+            fallbackSpeechRecognition();
+          } else {
+            throw new Error(data.error || 'Whisper transcription failed');
+          }
+        } catch (err: any) {
+          console.warn('Whisper fallback triggered:', err);
+          showToast('💡 Whisper unavailable. Falling back to local speech recognition...', 'info');
+          fallbackSpeechRecognition();
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecording(true);
+      showToast('🎙️ Recording voice input for Whisper...', 'info');
+    } catch (err) {
+      console.warn('Microphone stream access error, trying direct browser transcription:', err);
+      fallbackSpeechRecognition();
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      startRecording();
     }
   };
 
@@ -914,16 +1021,29 @@ export default function DashboardPage() {
             </div>
 
             {/* Chat Input */}
-            <form onSubmit={handleSendChat} style={{ display: 'flex', gap: 8 }}>
+            <form onSubmit={handleSendChat} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={toggleRecording}
+                style={{
+                  background: isRecording ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                  border: isRecording ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: isRecording ? '#f43f5e' : '#8899bb', cursor: 'pointer', transition: 'all 0.2s', outline: 'none'
+                }}
+                title={isRecording ? 'Stop Recording' : 'Voice Input (Whisper)'}
+              >
+                {isRecording ? <MicOff size={14} className="animate-pulse" /> : <Mic size={14} />}
+              </button>
               <input
                 className="input-field"
                 type="text"
-                placeholder="Ask about bills, shipping, agenda..."
+                placeholder={isRecording ? 'Listening...' : 'Ask about bills, shipping, agenda...'}
                 value={chatInput}
                 onChange={e => setChatInput(e.target.value)}
-                style={{ fontSize: '0.8rem', borderRadius: 8, background: 'rgba(255,255,255,0.02)' }}
+                style={{ fontSize: '0.8rem', borderRadius: 8, background: 'rgba(255,255,255,0.02)', flex: 1 }}
               />
-              <button type="submit" className="btn-primary" style={{ padding: '0 10px', borderRadius: 8 }}>
+              <button type="submit" className="btn-primary" style={{ padding: '0 12px', height: 34, borderRadius: 8 }}>
                 <Send size={12} />
               </button>
             </form>
