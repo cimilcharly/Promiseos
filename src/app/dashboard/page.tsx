@@ -71,6 +71,7 @@ export default function DashboardPage() {
   const [isRecordingDraft, setIsRecordingDraft] = useState(false);
   const draftMediaRecorderRef = useRef<MediaRecorder | null>(null);
   const draftAudioChunksRef = useRef<Blob[]>([]);
+  const [syncingCalendarId, setSyncingCalendarId] = useState<string | null>(null);
   
   // Interactive Command Persona State
   const [persona, setPersona] = useState<'Executive Minimalist' | 'The Motivator' | 'The Auditor'>('Executive Minimalist');
@@ -638,6 +639,28 @@ export default function DashboardPage() {
       showToast('⚠️ Could not generate draft.', 'error');
     } finally {
       setDraftLoading(false);
+    }
+  };
+
+  const handleSyncToGoogleCalendar = async (title: string, date: string, time: string, venue?: string, summary?: string) => {
+    setSyncingCalendarId(title);
+    try {
+      const response = await fetch('/api/calendar/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, date, time, venue, summary }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        showToast(`📅 ${data.message}`, 'success');
+      } else {
+        throw new Error(data.error || 'Failed calendar sync');
+      }
+    } catch (err: any) {
+      console.error(err);
+      showToast('⚠️ Direct Calendar sync failed.', 'error');
+    } finally {
+      setSyncingCalendarId(null);
     }
   };
 
@@ -1654,6 +1677,20 @@ export default function DashboardPage() {
                         >
                           <PlusCircle size={10} /> Calendar
                         </a>
+                        
+                        <button
+                          onClick={() => handleSyncToGoogleCalendar(meet.title, meet.date, meet.time, meet.joinLink || meet.venue, meet.summary)}
+                          disabled={syncingCalendarId === meet.title}
+                          style={{
+                            flex: 1, border: '1px solid rgba(0, 212, 255, 0.3)', background: 'rgba(0, 212, 255, 0.08)',
+                            borderRadius: 6, padding: '4px 0', fontSize: '0.68rem', color: '#00d4ff', cursor: 'pointer',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, transition: 'all 0.2s', outline: 'none'
+                          }}
+                          title="Sync directly to Google Calendar"
+                        >
+                          {syncingCalendarId === meet.title ? <RefreshCw size={10} className="animate-spin" /> : <Calendar size={10} />}
+                          {syncingCalendarId === meet.title ? 'Syncing...' : 'Direct Sync'}
+                        </button>
                       </div>
                     </div>
                   ))
