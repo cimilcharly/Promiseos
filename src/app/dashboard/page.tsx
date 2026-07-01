@@ -62,6 +62,11 @@ export default function DashboardPage() {
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+  const [customTasks, setCustomTasks] = useState<any[]>([]);
+  const [customTaskInput, setCustomTaskInput] = useState('');
+  const [isRecordingTask, setIsRecordingTask] = useState(false);
+  const taskMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const taskAudioChunksRef = useRef<Blob[]>([]);
   
   // Interactive Command Persona State
   const [persona, setPersona] = useState<'Executive Minimalist' | 'The Motivator' | 'The Auditor'>('Executive Minimalist');
@@ -315,6 +320,137 @@ export default function DashboardPage() {
       startRecording();
     }
   };
+
+  const handleAddCustomTask = (taskText: string) => {
+    if (!taskText.trim()) return;
+    const newTask = {
+      task: taskText.trim(),
+      deadline: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0], // 3 days default
+      emailSource: {
+        id: `custom-task-${Date.now()}`,
+        insights: { urgency: 'Medium', category: 'General' }
+      }
+    };
+    const updated = [...customTasks, newTask];
+    setCustomTasks(updated);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('promiseos_custom_tasks', JSON.stringify(updated));
+    }
+    setCustomTaskInput('');
+    showToast('🚀 Task added successfully!', 'success');
+  };
+
+  const fallbackSpeechRecognitionTask = () => {
+    if (typeof window === 'undefined') return;
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast('⚠️ Speech recognition not supported in this browser.', 'error');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'en-US';
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsRecordingTask(true);
+      showToast('🎙️ Dictating task (local speech recognition)...', 'info');
+    };
+
+    recognition.onresult = (event: any) => {
+      const speechToText = event.results[0][0].transcript;
+      setCustomTaskInput(speechToText);
+      showToast('🎙️ Custom task transcribed!', 'success');
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error('Speech recognition error', event.error);
+      setIsRecordingTask(false);
+    };
+
+    recognition.onend = () => {
+      setIsRecordingTask(false);
+    };
+
+    recognition.start();
+  };
+
+  const startRecordingTask = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      taskMediaRecorderRef.current = mediaRecorder;
+      taskAudioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          taskAudioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(taskAudioChunksRef.current, { type: 'audio/webm' });
+        
+        try {
+          const formData = new FormData();
+          formData.append('file', audioBlob, 'audio.webm');
+
+          const response = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData,
+          });
+
+          const data = await response.json();
+          if (data.text) {
+            setCustomTaskInput(data.text);
+            showToast('🎙️ Custom task transcribed via Whisper!', 'success');
+          } else {
+            throw new Error(data.error || 'Whisper transcription failed');
+          }
+        } catch (err: any) {
+          console.warn('Whisper fallback triggered for task:', err);
+          fallbackSpeechRecognitionTask();
+        }
+      };
+
+      mediaRecorder.start();
+      setIsRecordingTask(true);
+      showToast('🎙️ Recording voice task for Whisper...', 'info');
+    } catch (err) {
+      console.warn('Microphone stream access error for task, using local transcription:', err);
+      fallbackSpeechRecognitionTask();
+    }
+  };
+
+  const stopRecordingTask = () => {
+    if (taskMediaRecorderRef.current && isRecordingTask) {
+      taskMediaRecorderRef.current.stop();
+      taskMediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecordingTask(false);
+    }
+  };
+
+  const toggleRecordingTask = () => {
+    if (isRecordingTask) {
+      stopRecordingTask();
+    } else {
+      startRecordingTask();
+    }
+  };
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('promiseos_custom_tasks');
+      if (stored) {
+        try {
+          setCustomTasks(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -584,7 +720,8 @@ export default function DashboardPage() {
   // Search Filter across confirmed items
   const matchesSearch = (text: string) => text.toLowerCase().includes(searchQuery.toLowerCase());
   
-  const filteredTasks = confirmedTasks.filter(t => matchesSearch(t.task) && !completedTasks[t.task]);
+  const allTasks = [...confirmedTasks, ...customTasks];
+  const filteredTasks = allTasks.filter(t => matchesSearch(t.task) && !completedTasks[t.task]);
   const filteredDeadlines = confirmedDates.filter(d => matchesSearch(d.label));
   const filteredBills = confirmedBills.filter(b => matchesSearch(b.biller || ''));
   const filteredTrackings = confirmedTrackings.filter(t => matchesSearch(t.provider || '') || matchesSearch(t.trackingNumber || ''));
@@ -936,6 +1073,43 @@ export default function DashboardPage() {
               <span style={{ fontSize: '0.72rem', color: '#ec4899', background: 'rgba(236,72,153,0.1)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
                 {filteredTasks.length} PENDING
               </span>
+            </div>
+
+            {/* Quick Add Custom Task Bar */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 18, alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={toggleRecordingTask}
+                style={{
+                  background: isRecordingTask ? 'rgba(239, 68, 68, 0.15)' : 'rgba(255, 255, 255, 0.03)',
+                  border: isRecordingTask ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(255, 255, 255, 0.08)',
+                  borderRadius: 8, width: 34, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: isRecordingTask ? '#f43f5e' : '#8899bb', cursor: 'pointer', transition: 'all 0.2s', outline: 'none'
+                }}
+                title={isRecordingTask ? 'Stop Recording' : 'Voice Dictate Task'}
+              >
+                {isRecordingTask ? <MicOff size={14} className="animate-pulse" /> : <Mic size={14} />}
+              </button>
+              <input
+                className="input-field"
+                type="text"
+                placeholder={isRecordingTask ? 'Listening...' : 'Add a new task (e.g. Prepare roadmaps)...'}
+                value={customTaskInput}
+                onChange={e => setCustomTaskInput(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    handleAddCustomTask(customTaskInput);
+                  }
+                }}
+                style={{ fontSize: '0.8rem', borderRadius: 8, background: 'rgba(255,255,255,0.02)', flex: 1 }}
+              />
+              <button
+                onClick={() => handleAddCustomTask(customTaskInput)}
+                className="btn-primary"
+                style={{ height: 34, padding: '0 16px', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem' }}
+              >
+                <Plus size={14} /> Add
+              </button>
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
