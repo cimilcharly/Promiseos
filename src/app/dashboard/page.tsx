@@ -10,7 +10,7 @@ import {
   Eye, Clock, Sparkles, Filter, Trash2, ArrowUpRight,
   Send, Bot, User as UserIcon, Plus, X, BarChart3, TrendingUp,
   ThumbsUp, ThumbsDown, Luggage, Layers, Video, PlusCircle, Copy,
-  Award, ShieldCheck, Newspaper
+  Award, ShieldCheck, Newspaper, Play, Pause, Network, Volume2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MockEmail } from '@/lib/mock_emails';
@@ -57,6 +57,8 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isMockData, setIsMockData] = useState(false);
   const [activeScheduleTab, setActiveScheduleTab] = useState<'meetings' | 'deadlines'>('meetings');
+  const [activeView, setActiveView] = useState<'command-center' | 'knowledge-graph' | 'escalation-runway'>('command-center');
+  const [isPlayingBrief, setIsPlayingBrief] = useState(false);
   
   // Interactive Command Persona State
   const [persona, setPersona] = useState<'Executive Minimalist' | 'The Motivator' | 'The Auditor'>('Executive Minimalist');
@@ -171,6 +173,49 @@ export default function DashboardPage() {
       showToast('⚠️ Google auth failed: ' + err.message, 'error');
     }
   };
+
+  const handleToggleVoiceBrief = () => {
+    if (typeof window === 'undefined') return;
+
+    if (isPlayingBrief) {
+      window.speechSynthesis.cancel();
+      setIsPlayingBrief(false);
+      showToast('🔇 Voice briefing stopped.', 'info');
+    } else {
+      const briefText = getHeroBriefingText();
+      const utterance = new SpeechSynthesisUtterance(briefText);
+      
+      if (persona === 'The Motivator') {
+        utterance.pitch = 1.25;
+        utterance.rate = 1.1;
+      } else if (persona === 'The Auditor') {
+        utterance.pitch = 0.85;
+        utterance.rate = 0.95;
+      } else {
+        utterance.pitch = 1.0;
+        utterance.rate = 1.0;
+      }
+
+      utterance.onend = () => {
+        setIsPlayingBrief(false);
+      };
+      utterance.onerror = () => {
+        setIsPlayingBrief(false);
+      };
+
+      setIsPlayingBrief(true);
+      window.speechSynthesis.speak(utterance);
+      showToast('🔊 Playing synthesized AI voice briefing...', 'success');
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.speechSynthesis.cancel();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     if (consents) {
@@ -565,6 +610,45 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Dashboard View Tabs */}
+        <div style={{ display: 'flex', gap: 12, marginBottom: 24, borderBottom: '1px solid rgba(255,255,255,0.04)', paddingBottom: 12 }}>
+          <button
+            onClick={() => setActiveView('command-center')}
+            style={{
+              background: activeView === 'command-center' ? 'rgba(0, 212, 255, 0.1)' : 'transparent',
+              border: activeView === 'command-center' ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid transparent',
+              borderRadius: 10, padding: '8px 16px', fontSize: '0.8rem', color: activeView === 'command-center' ? '#00d4ff' : '#8899bb',
+              fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 8
+            }}
+          >
+            <Layers size={14} /> Command Center
+          </button>
+          
+          <button
+            onClick={() => setActiveView('knowledge-graph')}
+            style={{
+              background: activeView === 'knowledge-graph' ? 'rgba(0, 212, 255, 0.1)' : 'transparent',
+              border: activeView === 'knowledge-graph' ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid transparent',
+              borderRadius: 10, padding: '8px 16px', fontSize: '0.8rem', color: activeView === 'knowledge-graph' ? '#00d4ff' : '#8899bb',
+              fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 8
+            }}
+          >
+            <Network size={14} /> Knowledge Graph
+          </button>
+          
+          <button
+            onClick={() => setActiveView('escalation-runway')}
+            style={{
+              background: activeView === 'escalation-runway' ? 'rgba(0, 212, 255, 0.1)' : 'transparent',
+              border: activeView === 'escalation-runway' ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid transparent',
+              borderRadius: 10, padding: '8px 16px', fontSize: '0.8rem', color: activeView === 'escalation-runway' ? '#00d4ff' : '#8899bb',
+              fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 8
+            }}
+          >
+            <Clock size={14} /> Escalation & Runway
+          </button>
+        </div>
+
         {/* Connection Status Banner (Demo Mode vs Real Mode) */}
         {isMockData && (
           <motion.div
@@ -599,8 +683,11 @@ export default function DashboardPage() {
           </motion.div>
         )}
 
-        {/* Hero Section (AI Daily Briefing - Persona Customized) */}
-        <motion.div
+        {/* Command Center: Hero & Suggestions */}
+        {activeView === 'command-center' && (
+          <>
+            {/* Hero Section (AI Daily Briefing - Persona Customized) */}
+            <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45 }}
@@ -612,9 +699,46 @@ export default function DashboardPage() {
           }}
         >
           <div style={{ maxWidth: '75%' }}>
-            <span style={{ fontSize: '0.72rem', background: 'rgba(0, 212, 255, 0.12)', color: '#00d4ff', padding: '3px 10px', borderRadius: 99, fontWeight: 700 }}>
-              AI DAILY BRIEFING ({persona.toUpperCase()})
-            </span>
+            <style dangerouslySetInnerHTML={{ __html: `
+              @keyframes bounce {
+                0%, 100% { transform: scaleY(0.4); }
+                50% { transform: scaleY(1.2); }
+              }
+              .audio-wave-bar {
+                animation: bounce 0.8s ease-in-out infinite;
+                transform-origin: bottom;
+              }
+              .audio-wave-bar:nth-child(2) { animation-delay: 0.15s; }
+              .audio-wave-bar:nth-child(3) { animation-delay: 0.3s; }
+              .audio-wave-bar:nth-child(4) { animation-delay: 0.45s; }
+            ` }} />
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.72rem', background: 'rgba(0, 212, 255, 0.12)', color: '#00d4ff', padding: '3px 10px', borderRadius: 99, fontWeight: 700 }}>
+                AI DAILY BRIEFING ({persona.toUpperCase()})
+              </span>
+              
+              <button
+                onClick={handleToggleVoiceBrief}
+                style={{
+                  background: isPlayingBrief ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0, 212, 255, 0.12)',
+                  border: isPlayingBrief ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(0, 212, 255, 0.25)',
+                  borderRadius: 20, padding: '4px 12px', fontSize: '0.68rem', color: isPlayingBrief ? '#f43f5e' : '#00d4ff',
+                  display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s', outline: 'none'
+                }}
+              >
+                {isPlayingBrief ? <Pause size={10} /> : <Play size={10} />}
+                {isPlayingBrief ? 'Stop Briefing' : 'Listen to Briefing'}
+              </button>
+
+              {isPlayingBrief && (
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 12, paddingBottom: 2 }}>
+                  <span className="audio-wave-bar" style={{ width: 2, height: 6, background: '#00d4ff', borderRadius: 1 }} />
+                  <span className="audio-wave-bar" style={{ width: 2, height: 12, background: '#00d4ff', borderRadius: 1 }} />
+                  <span className="audio-wave-bar" style={{ width: 2, height: 8, background: '#00d4ff', borderRadius: 1 }} />
+                  <span className="audio-wave-bar" style={{ width: 2, height: 4, background: '#00d4ff', borderRadius: 1 }} />
+                </div>
+              )}
+            </div>
             <h2 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.4rem', color: '#f0f6ff', marginTop: 10, marginBottom: 8 }}>
               Good Morning, Charlie.
             </h2>
@@ -689,9 +813,12 @@ export default function DashboardPage() {
             </motion.div>
           )}
         </AnimatePresence>
+      </>
+    )}
 
         {/* Dashboard Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 20 }}>
+        {activeView === 'command-center' && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(12, 1fr)', gap: 20 }}>
           
           {/* 1. Task Center (Col Span: 8) */}
           <div className="glass-card" style={{ gridColumn: 'span 8', padding: 24, minHeight: 280 }}>
@@ -1291,6 +1418,278 @@ export default function DashboardPage() {
           </div>
 
         </div>
+        )}
+
+        {/* Knowledge Graph View */}
+        {activeView === 'knowledge-graph' && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="glass-card"
+            style={{ padding: 28, minHeight: 600, display: 'flex', flexDirection: 'column', gap: 20 }}
+          >
+            <div>
+              <h2 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.3rem', color: '#f0f6ff' }}>
+                Entity Relationship Neural Graph
+              </h2>
+              <p style={{ color: '#8899bb', fontSize: '0.8rem', marginTop: 4 }}>
+                Visual mapping of detected entities, connected emails, and commitments. Click any outer node to open email details.
+              </p>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 320px', gap: 24, flex: 1 }}>
+              {/* Interactive SVG Network Map */}
+              <div style={{
+                background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.04)',
+                borderRadius: 16, overflow: 'hidden', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 480
+              }}>
+                <svg width="100%" height="480" viewBox="0 0 700 480" style={{ overflow: 'visible' }}>
+                  <defs>
+                    <radialGradient id="centerGlow" cx="50%" cy="50%" r="50%">
+                      <stop offset="0%" stopColor="#00d4ff" stopOpacity="0.3" />
+                      <stop offset="100%" stopColor="#00d4ff" stopOpacity="0" />
+                    </radialGradient>
+                    <filter id="glow">
+                      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                      <feMerge>
+                        <feMergeNode in="coloredBlur"/>
+                        <feMergeNode in="SourceGraphic"/>
+                      </feMerge>
+                    </filter>
+                  </defs>
+
+                  {/* Pulsing connections to entities */}
+                  {/* Vercel */}
+                  <line x1="350" y1="240" x2="200" y2="140" stroke="rgba(0, 212, 255, 0.2)" strokeWidth="2" strokeDasharray="5,5" />
+                  {/* Amazon */}
+                  <line x1="350" y1="240" x2="500" y2="140" stroke="rgba(0, 212, 255, 0.2)" strokeWidth="2" strokeDasharray="5,5" />
+                  {/* Delta */}
+                  <line x1="350" y1="240" x2="200" y2="340" stroke="rgba(0, 212, 255, 0.2)" strokeWidth="2" strokeDasharray="5,5" />
+                  {/* Apex */}
+                  <line x1="350" y1="240" x2="500" y2="340" stroke="rgba(0, 212, 255, 0.2)" strokeWidth="2" strokeDasharray="5,5" />
+                  {/* Anthropic */}
+                  <line x1="350" y1="240" x2="350" y2="80" stroke="rgba(0, 212, 255, 0.2)" strokeWidth="2" strokeDasharray="5,5" />
+
+                  {/* Links from entities to children */}
+                  {/* Vercel Child */}
+                  <line x1="200" y1="140" x2="120" y2="100" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" />
+                  {/* Amazon Child */}
+                  <line x1="500" y1="140" x2="580" y2="100" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" />
+                  {/* Delta Child */}
+                  <line x1="200" y1="340" x2="120" y2="380" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" />
+                  {/* Apex Children */}
+                  <line x1="500" y1="340" x2="580" y2="310" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" />
+                  <line x1="500" y1="340" x2="580" y2="380" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" />
+                  {/* Anthropic Child */}
+                  <line x1="350" y1="80" x2="270" y2="40" stroke="rgba(255, 255, 255, 0.1)" strokeWidth="1" />
+
+                  {/* CENTER NODE: User */}
+                  <circle cx="350" cy="240" r="40" fill="url(#centerGlow)" />
+                  <circle cx="350" cy="240" r="20" fill="#0d1424" stroke="#00d4ff" strokeWidth="2" filter="url(#glow)" />
+                  <text x="350" y="244" fill="#00d4ff" fontSize="10" fontWeight="bold" textAnchor="middle" fontFamily="sans-serif">YOU</text>
+
+                  {/* ENTITY NODES */}
+                  {/* Vercel */}
+                  <circle cx="200" cy="140" r="16" fill="#0d1424" stroke="#f43f5e" strokeWidth="2" />
+                  <text x="200" y="166" fill="#8899bb" fontSize="10" textAnchor="middle" fontWeight="bold">Vercel</text>
+                  
+                  {/* Amazon */}
+                  <circle cx="500" cy="140" r="16" fill="#0d1424" stroke="#10b981" strokeWidth="2" />
+                  <text x="500" y="166" fill="#8899bb" fontSize="10" textAnchor="middle" fontWeight="bold">Amazon</text>
+
+                  {/* Delta */}
+                  <circle cx="200" cy="340" r="16" fill="#0d1424" stroke="#06b6d4" strokeWidth="2" />
+                  <text x="200" y="368" fill="#8899bb" fontSize="10" textAnchor="middle" fontWeight="bold">Delta</text>
+
+                  {/* Apex */}
+                  <circle cx="500" cy="340" r="16" fill="#0d1424" stroke="#3b82f6" strokeWidth="2" />
+                  <text x="500" y="368" fill="#8899bb" fontSize="10" textAnchor="middle" fontWeight="bold">Apex</text>
+
+                  {/* Anthropic */}
+                  <circle cx="350" cy="80" r="16" fill="#0d1424" stroke="#a855f7" strokeWidth="2" />
+                  <text x="350" y="108" fill="#8899bb" fontSize="10" textAnchor="middle" fontWeight="bold">Anthropic</text>
+
+                  {/* EMAIL/TASK SUB-NODES (Clickable) */}
+                  {/* Vercel invoice */}
+                  <g cursor="pointer" onClick={() => { const e = emails.find(em => em.id.includes('1')); if (e) setSelectedItem(e); }}>
+                    <circle cx="120" cy="100" r="8" fill="#f43f5e" filter="url(#glow)" />
+                    <text x="120" y="86" fill="#f43f5e" fontSize="8" textAnchor="middle">Invoice</text>
+                  </g>
+
+                  {/* Amazon Package */}
+                  <g cursor="pointer" onClick={() => { const e = emails.find(em => em.id.includes('2')); if (e) setSelectedItem(e); }}>
+                    <circle cx="580" cy="100" r="8" fill="#10b981" filter="url(#glow)" />
+                    <text x="580" y="86" fill="#10b981" fontSize="8" textAnchor="middle">Order</text>
+                  </g>
+
+                  {/* Delta flight */}
+                  <g cursor="pointer" onClick={() => { const e = emails.find(em => em.id.includes('6')); if (e) setSelectedItem(e); }}>
+                    <circle cx="120" cy="380" r="8" fill="#06b6d4" filter="url(#glow)" />
+                    <text x="120" y="396" fill="#06b6d4" fontSize="8" textAnchor="middle">Flight</text>
+                  </g>
+
+                  {/* Apex PM Roadmap */}
+                  <g cursor="pointer" onClick={() => { const e = emails.find(em => em.id.includes('3')); if (e) setSelectedItem(e); }}>
+                    <circle cx="580" cy="310" r="8" fill="#3b82f6" filter="url(#glow)" />
+                    <text x="580" y="296" fill="#3b82f6" fontSize="8" textAnchor="middle">Meeting</text>
+                  </g>
+
+                  {/* Apex DevOps Task */}
+                  <g cursor="pointer" onClick={() => { const e = emails.find(em => em.id.includes('4')); if (e) setSelectedItem(e); }}>
+                    <circle cx="580" cy="380" r="8" fill="#3b82f6" filter="url(#glow)" />
+                    <text x="580" y="396" fill="#3b82f6" fontSize="8" textAnchor="middle">Patch Task</text>
+                  </g>
+
+                  {/* Anthropic Subscription */}
+                  <g cursor="pointer" onClick={() => { const e = emails.find(em => em.id.includes('5')); if (e) setSelectedItem(e); }}>
+                    <circle cx="270" cy="40" r="8" fill="#a855f7" filter="url(#glow)" />
+                    <text x="270" y="26" fill="#a855f7" fontSize="8" textAnchor="middle">Claude Pro</text>
+                  </g>
+                </svg>
+              </div>
+
+              {/* Sidebar stats/legend */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 16 }}>
+                  <div style={{ fontSize: '0.85rem', color: '#00d4ff', fontWeight: 700, marginBottom: 8 }}>Graph Legend</div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: '0.72rem', color: '#8899bb' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#00d4ff' }} /> You / Core Identity</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#f43f5e' }} /> Finance / Vercel</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981' }} /> Orders / Amazon</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#06b6d4' }} /> Travel / Delta Airlines</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6' }} /> Careers / Apex Agency</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#a855f7' }} /> Subscriptions / Anthropic</div>
+                  </div>
+                </div>
+                
+                <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 16, flex: 1 }}>
+                  <div style={{ fontSize: '0.85rem', color: '#f0f6ff', fontWeight: 700, marginBottom: 8 }}>Dynamic Relations</div>
+                  <div style={{ fontSize: '0.72rem', color: '#8899bb', lineHeight: 1.5 }}>
+                    Each outer node represents an actionable item parsed from your emails. Double-click or click them to view the original content and trigger one-click drafts.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Commitment & Cashflow Runway View */}
+        {activeView === 'escalation-runway' && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}
+          >
+            {/* 1. Autonomous Commitment Escalation Guard */}
+            <div className="glass-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1rem', color: '#f0f6ff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <ShieldAlert size={18} color="#ef4444" /> Autonomous Escalation Guard
+                </h3>
+                <p style={{ color: '#8899bb', fontSize: '0.75rem', marginTop: 4 }}>
+                  Track escalation timelines and warnings for overdue agreements.
+                </p>
+              </div>
+
+              {/* Timelines and Toggles */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f0f6ff' }}>Auto SMS Reminders</span>
+                    <label style={{ position: 'relative', display: 'inline-block', width: 36, height: 20 }}>
+                      <input type="checkbox" defaultChecked style={{ opacity: 0, width: 0, height: 0 }} />
+                      <span style={{
+                        position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                        background: '#7c3aed', transition: '.4s', borderRadius: 34
+                      }} />
+                    </label>
+                  </div>
+                  <p style={{ fontSize: '0.7rem', color: '#8899bb', lineHeight: 1.4 }}>
+                    Sends warning texts to your phone 24 hours prior to deadline events.
+                  </p>
+                </div>
+
+                <div style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 12, padding: 16 }}>
+                  <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#f0f6ff' }}>Slack Channel Alerts</span>
+                    <label style={{ position: 'relative', display: 'inline-block', width: 36, height: 20 }}>
+                      <input type="checkbox" defaultChecked style={{ opacity: 0, width: 0, height: 0 }} />
+                      <span style={{
+                        position: 'absolute', cursor: 'pointer', top: 0, left: 0, right: 0, bottom: 0,
+                        background: '#7c3aed', transition: '.4s', borderRadius: 34
+                      }} />
+                    </label>
+                  </div>
+                  <p style={{ fontSize: '0.7rem', color: '#8899bb', lineHeight: 1.4 }}>
+                    Broadcasts commitment alerts directly to your team's Slack channels on delays.
+                  </p>
+                </div>
+
+                {/* Visual Escalation Steps */}
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 16 }}>
+                  <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8899bb', marginBottom: 12 }}>Escalation Pathway Flow</div>
+                  <div style={{ display: 'flex', justifySelf: 'stretch', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#8899bb', background: 'rgba(255,255,255,0.01)', padding: 10, borderRadius: 8 }}>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: '#10b981', fontWeight: 'bold' }}>Agree</div>
+                      <div style={{ fontSize: '0.6rem', marginTop: 2 }}>Day 0</div>
+                    </div>
+                    <span>→</span>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: '#f59e0b', fontWeight: 'bold' }}>Warn</div>
+                      <div style={{ fontSize: '0.6rem', marginTop: 2 }}>Day -1</div>
+                    </div>
+                    <span>→</span>
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ color: '#ef4444', fontWeight: 'bold' }}>Escalate</div>
+                      <div style={{ fontSize: '0.6rem', marginTop: 2 }}>Day +1</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Predictive Cashflow Runway */}
+            <div className="glass-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1rem', color: '#f0f6ff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <CreditCard size={18} color="#00d4ff" /> Predictive Cashflow Runway
+                </h3>
+                <p style={{ color: '#8899bb', fontSize: '0.75rem', marginTop: 4 }}>
+                  Future billing projections mapping upcoming subscriptions and invoices.
+                </p>
+              </div>
+
+              {/* Cashflow timeline projection list */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {filteredBills.map((bill, idx) => (
+                  <div key={idx} style={{
+                    padding: 12, background: 'rgba(244,63,94,0.02)', border: '1px solid rgba(244,63,94,0.1)', borderRadius: 10,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff' }}>{bill.biller}</div>
+                      <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 2 }}>Due Date: {bill.dueDate}</div>
+                    </div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#f43f5e' }}>-{bill.amount}</span>
+                  </div>
+                ))}
+
+                {confirmedSubscriptions.map((sub, idx) => (
+                  <div key={idx} style={{
+                    padding: 12, background: 'rgba(168,85,247,0.02)', border: '1px solid rgba(168,85,247,0.1)', borderRadius: 10,
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+                  }}>
+                    <div>
+                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff' }}>{sub.name} Renewal</div>
+                      <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 2 }}>Renewal: {sub.renewalDate}</div>
+                    </div>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#a855f7' }}>-{sub.cost}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
 
         {/* Premium Detail Overlay Modal */}
         <AnimatePresence>
