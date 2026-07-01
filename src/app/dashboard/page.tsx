@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MockEmail } from '@/lib/mock_emails';
+import { createClient } from '@/utils/supabase/client';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis,
   CartesianGrid, Tooltip
@@ -54,6 +55,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(false);
   const [emails, setEmails] = useState<MockEmail[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isMockData, setIsMockData] = useState(false);
+  const [activeScheduleTab, setActiveScheduleTab] = useState<'meetings' | 'deadlines'>('meetings');
   
   // Interactive Command Persona State
   const [persona, setPersona] = useState<'Executive Minimalist' | 'The Motivator' | 'The Auditor'>('Executive Minimalist');
@@ -130,17 +133,44 @@ export default function DashboardPage() {
       const data = await response.json();
       if (data.success && data.emails) {
         setEmails(data.emails);
-        showToast(`📊 Synchronized and analyzed ${data.emails.length} emails.`, 'success');
+        if (data.source === 'mock') {
+          setIsMockData(true);
+          showToast(`📊 Loaded mock sandbox data. Gmail connection needed.`, 'info');
+        } else {
+          setIsMockData(false);
+          showToast(`📊 Synchronized and analyzed ${data.emails.length} emails.`, 'success');
+        }
       } else {
         throw new Error(data.error || 'Failed sync');
       }
     } catch (err) {
       console.error(err);
+      setIsMockData(true);
       showToast('⚠️ Sync failed. Loaded mock intelligence dashboard.', 'error');
     } finally {
       setLoading(false);
     }
   }, [consents, user, showToast]);
+
+  const handleGoogleLogin = async () => {
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+          scopes: 'email profile https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/gmail.readonly',
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          },
+        },
+      });
+      if (error) throw error;
+    } catch (err: any) {
+      showToast('⚠️ Google auth failed: ' + err.message, 'error');
+    }
+  };
 
   useEffect(() => {
     if (consents) {
@@ -245,7 +275,6 @@ export default function DashboardPage() {
   };
 
   // 1. Process Confidence Gating & Dynamic Preference Weights
-  const suggestedInsights: any[] = [];
   const processedEmails = emails.map(email => {
     const category = email.insights.category;
     const weight = preferences[category] ?? 1.0;
@@ -279,6 +308,8 @@ export default function DashboardPage() {
     if (confidence < 0.5) return false;
     return true;
   });
+
+  const suggestedInsights = processedEmails.filter(email => !feedbacks[email.id]);
 
   // 2. Intelligent AI Relationship Mapping
   const detectRelationships = (emailsList: MockEmail[]): RelationshipBundle[] => {
@@ -533,6 +564,40 @@ export default function DashboardPage() {
             </button>
           </div>
         </div>
+
+        {/* Connection Status Banner (Demo Mode vs Real Mode) */}
+        {isMockData && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{
+              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              borderRadius: 16, padding: '16px 24px', marginBottom: 24,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <AlertTriangle size={20} color="#ef4444" />
+              <div>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#f0f6ff' }}>Demo Sandbox (Mock Data) Active</div>
+                <div style={{ fontSize: '0.78rem', color: '#8899bb', marginTop: 2 }}>
+                  Your Google connection is missing or expired. Connect Gmail to sync your actual emails, hackathon deadlines, and commitments.
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={handleGoogleLogin}
+              style={{
+                background: 'linear-gradient(135deg, #ef4444, #f59e0b)',
+                border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: '0.78rem', color: '#fff',
+                fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)'
+              }}
+            >
+              Connect Google Account
+            </button>
+          </motion.div>
+        )}
 
         {/* Hero Section (AI Daily Briefing - Persona Customized) */}
         <motion.div
@@ -987,60 +1052,116 @@ export default function DashboardPage() {
           </div>
 
           {/* 9. Schedule & Agenda */}
-          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20 }}>
-            <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
-              <Calendar size={16} color="#7c3aed" /> Schedule & Agenda
-            </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {confirmedMeetings.length > 0 ? (
-                confirmedMeetings.slice(0, 3).map((meet, idx) => (
-                  <div key={idx} style={{
-                    padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10,
-                    display: 'flex', flexDirection: 'column', gap: 10
-                  }}>
-                    <div onClick={() => setSelectedItem(meet.emailSource)} style={{ cursor: 'pointer' }}>
-                      <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {meet.title}
-                      </div>
-                      <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
-                        <span>Date: {meet.date}</span>
-                        <span style={{ color: '#7c3aed' }}>{meet.time}</span>
-                      </div>
-                      <div style={{ fontSize: '0.65rem', color: '#4a5a7a', marginTop: 2 }}>Platform: {meet.venue}</div>
-                    </div>
+          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+              <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Calendar size={16} color="#7c3aed" /> Schedule & Deadlines
+              </h3>
+              
+              {/* Tab Selector */}
+              <div style={{ display: 'flex', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: 2 }}>
+                <button
+                  onClick={() => setActiveScheduleTab('meetings')}
+                  style={{
+                    border: 'none', background: activeScheduleTab === 'meetings' ? 'rgba(124, 58, 237, 0.15)' : 'none',
+                    color: activeScheduleTab === 'meetings' ? '#a855f7' : '#8899bb',
+                    borderRadius: 6, padding: '2px 8px', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer'
+                  }}
+                >
+                  Meetings
+                </button>
+                <button
+                  onClick={() => setActiveScheduleTab('deadlines')}
+                  style={{
+                    border: 'none', background: activeScheduleTab === 'deadlines' ? 'rgba(124, 58, 237, 0.15)' : 'none',
+                    color: activeScheduleTab === 'deadlines' ? '#a855f7' : '#8899bb',
+                    borderRadius: 6, padding: '2px 8px', fontSize: '0.68rem', fontWeight: 700, cursor: 'pointer'
+                  }}
+                >
+                  Deadlines
+                </button>
+              </div>
+            </div>
 
-                    <div style={{ display: 'flex', gap: 8, borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 8 }}>
-                      {meet.joinLink && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflowY: 'auto', maxHeight: 180 }}>
+              {activeScheduleTab === 'meetings' ? (
+                confirmedMeetings.length > 0 ? (
+                  confirmedMeetings.slice(0, 3).map((meet, idx) => (
+                    <div key={idx} style={{
+                      padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10,
+                      display: 'flex', flexDirection: 'column', gap: 10
+                    }}>
+                      <div onClick={() => setSelectedItem(meet.emailSource)} style={{ cursor: 'pointer' }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {meet.title}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 4, display: 'flex', justifyContent: 'space-between' }}>
+                          <span>Date: {meet.date}</span>
+                          <span style={{ color: '#7c3aed' }}>{meet.time}</span>
+                        </div>
+                        <div style={{ fontSize: '0.65rem', color: '#4a5a7a', marginTop: 2 }}>Platform: {meet.venue}</div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 8, borderTop: '1px solid rgba(255,255,255,0.04)', paddingTop: 8 }}>
+                        {meet.joinLink && (
+                          <a
+                            href={meet.joinLink}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{
+                              flex: 1, textDecoration: 'none', background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.2)',
+                              borderRadius: 6, padding: '4px 0', fontSize: '0.68rem', color: '#00d4ff', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4
+                            }}
+                          >
+                            <Video size={10} /> Join Meeting
+                          </a>
+                        )}
                         <a
-                          href={meet.joinLink}
+                          href={getGoogleCalendarLink(meet.title, meet.date, meet.time, meet.joinLink)}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
-                            flex: 1, textDecoration: 'none', background: 'rgba(0,212,255,0.1)', border: '1px solid rgba(0,212,255,0.2)',
-                            borderRadius: 6, padding: '4px 0', fontSize: '0.68rem', color: '#00d4ff', cursor: 'pointer',
+                            flex: 1, textDecoration: 'none', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
+                            borderRadius: 6, padding: '4px 0', fontSize: '0.68rem', color: '#f0f6ff', cursor: 'pointer',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4
                           }}
                         >
-                          <Video size={10} /> Join Meeting
+                          <PlusCircle size={10} /> Calendar
                         </a>
-                      )}
-                      <a
-                        href={getGoogleCalendarLink(meet.title, meet.date, meet.time, meet.joinLink)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          flex: 1, textDecoration: 'none', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)',
-                          borderRadius: 6, padding: '4px 0', fontSize: '0.68rem', color: '#f0f6ff', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4
-                        }}
-                      >
-                        <PlusCircle size={10} /> Calendar
-                      </a>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))
+                ) : (
+                  <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>No meetings scheduled.</div>
+                )
               ) : (
-                <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center' }}>No meetings scheduled.</div>
+                filteredDeadlines.length > 0 ? (
+                  filteredDeadlines.map((deadline, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => setSelectedItem(deadline.emailSource)}
+                      style={{
+                        padding: 12, background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10,
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer'
+                      }}
+                    >
+                      <div style={{ minWidth: 0, flex: 1, marginRight: 8 }}>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 600, color: '#f0f6ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {deadline.label}
+                        </div>
+                        <div style={{ fontSize: '0.68rem', color: '#8899bb', marginTop: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          From: {deadline.emailSource.subject}
+                        </div>
+                      </div>
+                      <span style={{ fontSize: '0.7rem', background: 'rgba(124, 58, 237, 0.12)', border: '1px solid rgba(124, 58, 237, 0.2)', borderRadius: 6, padding: '3px 8px', color: '#a855f7', whiteSpace: 'nowrap' }}>
+                        {deadline.date}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ color: '#4a5a7a', fontSize: '0.78rem', textAlign: 'center', padding: '20px 0' }}>No deadlines extracted.</div>
+                )
               )}
             </div>
           </div>
@@ -1068,8 +1189,8 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* 11. Analytics & Trends (Col Span: 8) */}
-          <div className="glass-card" style={{ gridColumn: 'span 8', padding: 20, height: 260 }}>
+          {/* 11. Analytics & Trends (Col Span: 4) */}
+          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, height: 260 }}>
             <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
               <BarChart3 size={16} color="#00d4ff" /> Sync Analytics
             </h3>
@@ -1088,6 +1209,85 @@ export default function DashboardPage() {
                 <Area type="monotone" dataKey="Synced" stroke="#00d4ff" strokeWidth={2} fillOpacity={1} fill="url(#colorSynced)" />
               </AreaChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* 12. AI Priority Tuning (Col Span: 4) */}
+          <div className="glass-card" style={{ gridColumn: 'span 4', padding: 20, height: 260, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f0f6ff', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={16} color="#00d4ff" /> AI Priority Tuning
+              </h3>
+              <button
+                onClick={() => {
+                  setPreferences({});
+                  localStorage.removeItem('promiseos_user_preferences');
+                  showToast('⚙️ Preference weights reset to defaults.', 'info');
+                }}
+                style={{
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 6, padding: '2px 8px', fontSize: '0.65rem', color: '#8899bb', cursor: 'pointer'
+                }}
+              >
+                Reset
+              </button>
+            </div>
+            
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
+              {Object.keys(statusColors).map((category) => {
+                const weight = preferences[category] ?? 1.0;
+                return (
+                  <div key={category} style={{
+                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                    padding: '6px 10px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.03)', borderRadius: 8
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColors[category] }} />
+                      <span style={{ fontSize: '0.72rem', color: '#8899bb', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {category}
+                      </span>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: weight > 1.0 ? '#10b981' : weight < 1.0 ? '#f43f5e' : '#8899bb', minWidth: 32, textAlign: 'right' }}>
+                        {weight.toFixed(1)}x
+                      </span>
+                      <div style={{ display: 'flex', gap: 4 }}>
+                        <button
+                          onClick={() => {
+                            const newWeight = Math.max(0.1, parseFloat((weight - 0.1).toFixed(2)));
+                            const updated = { ...preferences, [category]: newWeight };
+                            setPreferences(updated);
+                            localStorage.setItem('promiseos_user_preferences', JSON.stringify(updated));
+                          }}
+                          style={{
+                            width: 20, height: 20, borderRadius: 4, border: '1px solid rgba(255,255,255,0.08)',
+                            background: 'rgba(255,255,255,0.02)', color: '#f0f6ff', fontSize: '0.7rem',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                          }}
+                        >
+                          -
+                        </button>
+                        <button
+                          onClick={() => {
+                            const newWeight = Math.min(1.5, parseFloat((weight + 0.1).toFixed(2)));
+                            const updated = { ...preferences, [category]: newWeight };
+                            setPreferences(updated);
+                            localStorage.setItem('promiseos_user_preferences', JSON.stringify(updated));
+                          }}
+                          style={{
+                            width: 20, height: 20, borderRadius: 4, border: '1px solid rgba(255,255,255,0.08)',
+                            background: 'rgba(255,255,255,0.02)', color: '#f0f6ff', fontSize: '0.7rem',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer'
+                          }}
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
         </div>
