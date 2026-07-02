@@ -354,6 +354,107 @@ export default function DashboardPage() {
     }
   };
 
+  const handleExportWord = () => {
+    try {
+      const total = commitments.length;
+      const completed = commitments.filter(c => c.status === 'completed').length;
+      const active = commitments.filter(c => c.status !== 'completed' && c.status !== 'overdue').length;
+      const overdue = commitments.filter(c => c.status === 'overdue').length;
+      const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      const commitmentRowsHTML = commitments.map(c => `
+        <tr style="border-bottom: 1px solid #cbd5e1;">
+          <td style="padding: 8px; font-family: Arial, sans-serif; font-size: 11pt;">${c.task}</td>
+          <td style="padding: 8px; font-family: Arial, sans-serif; font-size: 11pt;">${c.owner}</td>
+          <td style="padding: 8px; font-family: Arial, sans-serif; font-size: 11pt;">${c.deadline}</td>
+          <td style="padding: 8px; font-family: Arial, sans-serif; font-size: 11pt; font-weight: bold; color: ${c.status === 'completed' ? '#15803d' : c.status === 'overdue' ? '#b91c1c' : '#475569'};">${c.status.toUpperCase()}</td>
+          <td style="padding: 8px; font-family: Arial, sans-serif; font-size: 11pt;">${c.priority}</td>
+        </tr>
+      `).join('');
+
+      const htmlContent = `
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <title>PromiseOS Commitments Report</title>
+          <!--[if gte mso 9]>
+          <xml>
+            <w:WordDocument>
+              <w:View>Print</w:View>
+              <w:Zoom>100</w:Zoom>
+            </w:WordDocument>
+          </xml>
+          <![endif]-->
+          <style>
+            p.MsoNormal, li.MsoNormal, div.MsoNormal {
+              margin: 0in;
+              margin-bottom: .0001pt;
+              font-size: 11.0pt;
+              font-family: "Arial",sans-serif;
+            }
+          </style>
+        </head>
+        <body style="padding: 40px; font-family: Arial, sans-serif;">
+          <h1 style="font-family: Arial, sans-serif; font-size: 24pt; font-weight: bold; margin: 0 0 4px 0;">PromiseOS</h1>
+          <div style="font-size: 10pt; color: #64748b; margin-bottom: 20px;">Personal Intelligence Command Workspace Report</div>
+          
+          <table style="width: 100%; border: 1px solid #cbd5e1; margin-bottom: 20px; border-collapse: collapse;">
+            <tr style="background-color: #f1f5f9;">
+              <td style="padding: 10px; font-weight: bold; border: 1px solid #cbd5e1;">Metric</td>
+              <td style="padding: 10px; font-weight: bold; border: 1px solid #cbd5e1;">Value</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #cbd5e1;">Total Commitments</td>
+              <td style="padding: 8px; border: 1px solid #cbd5e1; font-weight: bold;">${total}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #cbd5e1;">Completed Commitments</td>
+              <td style="padding: 8px; border: 1px solid #cbd5e1; color: #15803d; font-weight: bold;">${completed}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #cbd5e1;">Overdue Commitments</td>
+              <td style="padding: 8px; border: 1px solid #cbd5e1; color: #b91c1c; font-weight: bold;">${overdue}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #cbd5e1;">Completion Rate</td>
+              <td style="padding: 8px; border: 1px solid #cbd5e1; color: #1d4ed8; font-weight: bold;">${completionRate}%</td>
+            </tr>
+          </table>
+
+          <h2 style="font-family: Arial, sans-serif; font-size: 16pt; font-weight: bold; margin-top: 20px; margin-bottom: 10px;">Commitment Details</h2>
+          <table style="width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1;">
+            <thead>
+              <tr style="background-color: #f8fafc; border-bottom: 2px solid #cbd5e1;">
+                <th style="padding: 8px; text-align: left; font-family: Arial, sans-serif; font-size: 10pt; font-weight: bold; color: #64748b; border: 1px solid #cbd5e1;">Commitment / Task</th>
+                <th style="padding: 8px; text-align: left; font-family: Arial, sans-serif; font-size: 10pt; font-weight: bold; color: #64748b; border: 1px solid #cbd5e1;">Owner</th>
+                <th style="padding: 8px; text-align: left; font-family: Arial, sans-serif; font-size: 10pt; font-weight: bold; color: #64748b; border: 1px solid #cbd5e1;">Deadline</th>
+                <th style="padding: 8px; text-align: left; font-family: Arial, sans-serif; font-size: 10pt; font-weight: bold; color: #64748b; border: 1px solid #cbd5e1;">Status</th>
+                <th style="padding: 8px; text-align: left; font-family: Arial, sans-serif; font-size: 10pt; font-weight: bold; color: #64748b; border: 1px solid #cbd5e1;">Priority</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${commitmentRowsHTML || '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #64748b;">No active commitments.</td></tr>'}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      const blob = new Blob(['\ufeff' + htmlContent], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `PromiseOS_Commitments_Report_${new Date().toISOString().split('T')[0]}.doc`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('📝 Word Document downloaded successfully!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('❌ Failed to export Word report', 'error');
+    }
+  };
+
   const handleToggleVoiceBrief = () => {
     if (typeof window === 'undefined') return;
 
@@ -1398,6 +1499,17 @@ export default function DashboardPage() {
                   }}
                 >
                   Generate PDF
+                </button>
+                <button
+                  onClick={handleExportWord}
+                  title="Export commitments to Word document"
+                  style={{
+                    background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.15)',
+                    borderRadius: 6, padding: '4px 10px', fontSize: '0.72rem', color: '#a855f7',
+                    cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 4
+                  }}
+                >
+                  Export Word
                 </button>
                 <span style={{ fontSize: '0.72rem', color: '#ec4899', background: 'rgba(236,72,153,0.1)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
                   {filteredTasks.length} PENDING
