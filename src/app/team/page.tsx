@@ -1,7 +1,7 @@
 'use client';
 // src/app/team/page.tsx — Team Reliability Dashboard with Framer Motion
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Sidebar from '@/components/Sidebar';
 import { useApp } from '@/contexts/AppContext';
 import { TeamMember } from '@/lib/types';
@@ -207,6 +207,82 @@ function MemberCard({ member, commitments, onRemind }: {
 export default function TeamPage() {
   const { members, commitments, sendSimulatedReminder, stats, showToast } = useApp();
   const [sort, setSort] = useState<'score' | 'name' | 'overdue'>('score');
+  const [activeTab, setActiveTab] = useState<'human' | 'ai'>('human');
+
+  // AI Agent States
+  const [aiAgents, setAiAgents] = useState([
+    {
+      id: 'austin',
+      name: 'Austin (Billing AI)',
+      role: 'Invoice Auditor',
+      avatar: '💼',
+      color: '#10b981',
+      active: true,
+      prompt: 'Verify all invoices, highlight high-priced renewals, and calculate the exact cash runway.',
+      capabilities: ['Invoice Parsing', 'Runway Calculation', 'Subscription Analysis'],
+      logs: [
+        'Audited Vercel subscription invoice ($40.00)',
+        'Extracted Delta Airlines flight itinerary (NYC, July 10)',
+        'Updated 30-day cashflow runway forecast'
+      ]
+    },
+    {
+      id: 'ava',
+      name: 'Ava (DevOps Coordinator)',
+      role: 'Deployment Safety Officer',
+      avatar: '🤖',
+      color: '#a855f7',
+      active: true,
+      prompt: 'Check tasks from DevOps channels, flag overdue commitments, and queue alerts.',
+      capabilities: ['Task Extraction', 'Escalation Auditing', 'Priority Routing'],
+      logs: [
+        'Extracted task: Apex Agency security patch (Due July 3)',
+        'Queued alert: Vercel deployment pipeline check is overdue',
+        'Auto-assigned Apex task to developer team'
+      ]
+    },
+    {
+      id: 'arthur',
+      name: 'Arthur (Scheduler AI)',
+      role: 'Executive Secretary',
+      avatar: '📅',
+      color: '#00d4ff',
+      active: true,
+      prompt: 'Cross-reference flights with calendar, detect schedule conflicts, and write polite reschedule drafts.',
+      capabilities: ['Direct Syncing', 'Conflict Auditing', 'Smart Rescheduling'],
+      logs: [
+        'Synced Delta flight details directly to Google Calendar',
+        'Detected timeline overlap on July 5 (Meeting vs. Flight)',
+        'Drafted reschedule email template'
+      ]
+    }
+  ]);
+
+  // Load AI Agent settings
+  useEffect(() => {
+    const saved = localStorage.getItem('promiseos_ai_agents');
+    if (saved) {
+      try {
+        setAiAgents(JSON.parse(saved));
+      } catch (e) {
+        console.warn(e);
+      }
+    }
+  }, []);
+
+  const handleUpdateAgentPrompt = (id: string, newPrompt: string) => {
+    const updated = aiAgents.map(agent => agent.id === id ? { ...agent, prompt: newPrompt } : agent);
+    setAiAgents(updated);
+    localStorage.setItem('promiseos_ai_agents', JSON.stringify(updated));
+    showToast('💾 AI Agent instructions saved!', 'success');
+  };
+
+  const handleToggleAgentActive = (id: string, active: boolean) => {
+    const updated = aiAgents.map(agent => agent.id === id ? { ...agent, active } : agent);
+    setAiAgents(updated);
+    localStorage.setItem('promiseos_ai_agents', JSON.stringify(updated));
+    showToast(`🤖 ${active ? 'Activated' : 'Deactivated'} AI Agent.`, 'info');
+  };
   
   // Invitation states
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -262,120 +338,268 @@ export default function TeamPage() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
-          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 28 }}
+          style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}
         >
           <div>
             <h1 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.8rem', marginBottom: 4 }}>
-              Team Reliability
+              Team & AI Squad
             </h1>
             <p style={{ color: '#8899bb', fontSize: '0.9rem' }}>
-              {members.length} members · {stats.reliabilityAvg}% average reliability
+              Manage your human team reliability rankings and customize background AI Agent Workers.
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <button
-              onClick={() => setShowInviteModal(true)}
-              className="btn-primary"
-              style={{ padding: '6px 14px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}
-            >
-              <Plus size={12} /> Invite Member
-            </button>
-            {(['score', 'name', 'overdue'] as const).map(s => (
-              <button key={s} onClick={() => setSort(s)}
-                style={{
-                  padding: '6px 14px', fontSize: '0.78rem', fontWeight: 600,
-                  borderRadius: 8, border: '1px solid',
-                  borderColor: sort === s ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.06)',
-                  background: sort === s ? 'rgba(0,212,255,0.08)' : 'transparent',
-                  color: sort === s ? '#00d4ff' : '#8899bb',
-                  cursor: 'pointer', transition: 'all 0.2s', textTransform: 'capitalize',
-                }}>
-                {s === 'score' ? '↓ Score' : s === 'name' ? 'A-Z' : '⚠ Overdue'}
-              </button>
-            ))}
+            {activeTab === 'human' && (
+              <>
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="btn-primary"
+                  style={{ padding: '6px 14px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                >
+                  <Plus size={12} /> Invite Member
+                </button>
+                {(['score', 'name', 'overdue'] as const).map(s => (
+                  <button key={s} onClick={() => setSort(s)}
+                    style={{
+                      padding: '6px 14px', fontSize: '0.78rem', fontWeight: 600,
+                      borderRadius: 8, border: '1px solid',
+                      borderColor: sort === s ? 'rgba(0,212,255,0.3)' : 'rgba(255,255,255,0.06)',
+                      background: sort === s ? 'rgba(0,212,255,0.08)' : 'transparent',
+                      color: sort === s ? '#00d4ff' : '#8899bb',
+                      cursor: 'pointer', transition: 'all 0.2s', textTransform: 'capitalize',
+                    }}>
+                    {s === 'score' ? '↓ Score' : s === 'name' ? 'A-Z' : '⚠ Overdue'}
+                  </button>
+                ))}
+              </>
+            )}
           </div>
         </motion.div>
 
-        {/* Summary spotlight cards */}
-        <motion.div
-          initial="hidden"
-          animate="show"
-          variants={{
-            hidden: {},
-            show: { transition: { staggerChildren: 0.08 } },
-          }}
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 28 }}
-        >
-          <motion.div
-            variants={{
-              hidden: { opacity: 0, scale: 0.95, y: 15 },
-              show: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 120 } },
+        {/* Tab Selection */}
+        <div style={{ display: 'flex', gap: 12, borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: 12, marginBottom: 24 }}>
+          <button
+            onClick={() => setActiveTab('human')}
+            style={{
+              background: 'none', border: 'none', color: activeTab === 'human' ? '#f0f6ff' : '#4a5a7a',
+              fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', position: 'relative', padding: '6px 12px', outline: 'none'
             }}
-            className="glass-card"
-            style={{ padding: 20, borderColor: 'rgba(16,185,129,0.15)' }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <Award size={18} color="#10b981" />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Top Performer</span>
-            </div>
-            <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: '#f0f6ff', marginBottom: 2 }}>
-              {topPerformer ? topPerformer.name : 'N/A'}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: '#8899bb' }}>
-              {topPerformer ? `${topPerformer.reliabilityScore}% reliability · ${topPerformer.role}` : 'No data loaded'}
-            </div>
-          </motion.div>
-
-          <motion.div
-            variants={{
-              hidden: { opacity: 0, scale: 0.95, y: 15 },
-              show: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 120 } },
+            Human Team Members
+            {activeTab === 'human' && (
+              <motion.div layoutId="teamActiveLine" style={{ position: 'absolute', bottom: -13, left: 0, right: 0, height: 2, background: '#00d4ff' }} />
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('ai')}
+            style={{
+              background: 'none', border: 'none', color: activeTab === 'ai' ? '#f0f6ff' : '#4a5a7a',
+              fontSize: '0.9rem', fontWeight: 600, cursor: 'pointer', position: 'relative', padding: '6px 12px', outline: 'none'
             }}
-            className="glass-card"
-            style={{ padding: 20, borderColor: 'rgba(244,63,94,0.15)' }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <AlertTriangle size={18} color="#f43f5e" />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f43f5e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Needs Attention</span>
-            </div>
-            <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: '#f0f6ff', marginBottom: 2 }}>
-              {mostRisk ? mostRisk.name : 'N/A'}
-            </div>
-            <div style={{ fontSize: '0.8rem', color: '#8899bb' }}>
-              {mostRisk ? `${mostRisk.overdue} overdue · ${mostRisk.reliabilityScore}% reliability` : 'No data loaded'}
-            </div>
-          </motion.div>
+            AI Agent Squad (Virtual Workers)
+            {activeTab === 'ai' && (
+              <motion.div layoutId="teamActiveLine" style={{ position: 'absolute', bottom: -13, left: 0, right: 0, height: 2, background: '#00d4ff' }} />
+            )}
+          </button>
+        </div>
 
+        {activeTab === 'human' && (
+          <>
+            {/* Summary spotlight cards */}
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={{
+                hidden: {},
+                show: { transition: { staggerChildren: 0.08 } },
+              }}
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 28 }}
+            >
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, scale: 0.95, y: 15 },
+                  show: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 120 } },
+                }}
+                className="glass-card"
+                style={{ padding: 20, borderColor: 'rgba(16,185,129,0.15)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                  <Award size={18} color="#10b981" />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#10b981', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Top Performer</span>
+                </div>
+                <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: '#f0f6ff', marginBottom: 2 }}>
+                  {topPerformer ? topPerformer.name : 'N/A'}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#8899bb' }}>
+                  {topPerformer ? `${topPerformer.reliabilityScore}% reliability · ${topPerformer.role}` : 'No data loaded'}
+                </div>
+              </motion.div>
+
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, scale: 0.95, y: 15 },
+                  show: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 120 } },
+                }}
+                className="glass-card"
+                style={{ padding: 20, borderColor: 'rgba(244,63,94,0.15)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                  <AlertTriangle size={18} color="#f43f5e" />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f43f5e', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Needs Attention</span>
+                </div>
+                <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.1rem', color: '#f0f6ff', marginBottom: 2 }}>
+                  {mostRisk ? mostRisk.name : 'N/A'}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#8899bb' }}>
+                  {mostRisk ? `${mostRisk.overdue} overdue · ${mostRisk.reliabilityScore}% reliability` : 'No data loaded'}
+                </div>
+              </motion.div>
+
+              <motion.div
+                variants={{
+                  hidden: { opacity: 0, scale: 0.95, y: 15 },
+                  show: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 120 } },
+                }}
+                className="glass-card"
+                style={{ padding: 20 }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                  <TrendingUp size={18} color="#7c3aed" />
+                  <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Team Average</span>
+                </div>
+                <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.8rem', color: '#f0f6ff', lineHeight: 1 }}>
+                  {stats.reliabilityAvg}%
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#8899bb', marginTop: 4 }}>Across {members.length} team members</div>
+              </motion.div>
+            </motion.div>
+
+            {/* Member cards grid with layout transitions */}
+            <motion.div
+              layout
+              style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}
+            >
+              <AnimatePresence>
+                {sorted.map(m => (
+                  <MemberCard key={m.id} member={m} commitments={commitments} onRemind={sendSimulatedReminder} />
+                ))}
+              </AnimatePresence>
+            </motion.div>
+          </>
+        )}
+
+        {activeTab === 'ai' && (
           <motion.div
-            variants={{
-              hidden: { opacity: 0, scale: 0.95, y: 15 },
-              show: { opacity: 1, scale: 1, y: 0, transition: { type: 'spring', stiffness: 120 } },
-            }}
-            className="glass-card"
-            style={{ padding: 20 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-              <TrendingUp size={18} color="#7c3aed" />
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#7c3aed', textTransform: 'uppercase', letterSpacing: '0.04em' }}>Team Average</span>
-            </div>
-            <div style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.8rem', color: '#f0f6ff', lineHeight: 1 }}>
-              {stats.reliabilityAvg}%
-            </div>
-            <div style={{ fontSize: '0.8rem', color: '#8899bb', marginTop: 4 }}>Across {members.length} team members</div>
-          </motion.div>
-        </motion.div>
+            {aiAgents.map(agent => (
+              <motion.div
+                key={agent.id}
+                className="glass-card"
+                style={{ padding: 0, overflow: 'hidden' }}
+                whileHover={{ y: -3, transition: { duration: 0.15 } }}
+              >
+                {/* Top colored status strip */}
+                <div style={{ height: 3, background: agent.active ? `linear-gradient(90deg, ${agent.color}, ${agent.color}88)` : 'rgba(255,255,255,0.1)' }} />
 
-        {/* Member cards grid with layout transitions */}
-        <motion.div
-          layout
-          style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 20 }}
-        >
-          <AnimatePresence>
-            {sorted.map(m => (
-              <MemberCard key={m.id} member={m} commitments={commitments} onRemind={sendSimulatedReminder} />
+                <div style={{ padding: 24 }}>
+                  {/* Header */}
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 20 }}>
+                    {/* Avatar */}
+                    <div style={{
+                      width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
+                      background: agent.active ? `linear-gradient(135deg, ${agent.color}44, ${agent.color}11)` : 'rgba(255,255,255,0.02)',
+                      border: `1px solid ${agent.active ? agent.color : 'rgba(255,255,255,0.06)'}`,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: '1.2rem', color: 'white',
+                    }}>
+                      {agent.avatar}
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem', color: agent.active ? '#f0f6ff' : '#4a5a7a' }}>{agent.name}</div>
+                          <div style={{ fontSize: '0.78rem', color: '#8899bb', marginTop: 2 }}>{agent.role}</div>
+                        </div>
+
+                        {/* Status Toggle Switch */}
+                        <button
+                          onClick={() => handleToggleAgentActive(agent.id, !agent.active)}
+                          style={{
+                            width: 32, height: 18, borderRadius: 999, border: 'none', cursor: 'pointer',
+                            background: agent.active ? `linear-gradient(135deg, ${agent.color}, ${agent.color}bb)` : 'rgba(255,255,255,0.1)',
+                            position: 'relative', transition: 'background 0.3s ease', flexShrink: 0,
+                          }}
+                        >
+                          <div style={{
+                            width: 12, height: 12, borderRadius: '50%', background: 'white',
+                            position: 'absolute', top: 3, left: agent.active ? 17 : 3,
+                            transition: 'left 0.3s ease',
+                          }} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Capabilities Tags */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
+                    {agent.capabilities.map((cap, i) => (
+                      <span key={i} style={{
+                        fontSize: '0.62rem', fontWeight: 600, borderRadius: 4, padding: '2px 6px',
+                        color: agent.active ? agent.color : '#4a5a7a',
+                        background: agent.active ? `${agent.color}14` : 'rgba(255,255,255,0.02)',
+                        border: `1px solid ${agent.active ? `${agent.color}25` : 'rgba(255,255,255,0.04)'}`
+                      }}>
+                        {cap}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Customize Instructions */}
+                  <div style={{ marginBottom: 18 }}>
+                    <label style={{ fontSize: '0.7rem', color: '#4a5a7a', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 6 }}>
+                      Customize Prompt Instructions
+                    </label>
+                    <textarea
+                      disabled={!agent.active}
+                      defaultValue={agent.prompt}
+                      onBlur={(e) => handleUpdateAgentPrompt(agent.id, e.target.value)}
+                      placeholder="Enter prompt rules..."
+                      style={{
+                        width: '100%', height: 50, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(255,255,255,0.06)',
+                        borderRadius: 8, padding: 8, fontSize: '0.72rem', color: agent.active ? '#f0f6ff' : '#4a5a7a',
+                        outline: 'none', resize: 'none', transition: 'all 0.2s'
+                      }}
+                    />
+                  </div>
+
+                  {/* Operations Log */}
+                  <div>
+                    <label style={{ fontSize: '0.7rem', color: '#4a5a7a', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: 8 }}>
+                      Background Operations Feed
+                    </label>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {agent.logs.map((log, i) => (
+                        <div key={i} style={{
+                          padding: '6px 8px', background: 'rgba(0,0,0,0.1)', border: '1px solid rgba(255,255,255,0.02)',
+                          borderRadius: 6, fontSize: '0.7rem', color: agent.active ? '#8899bb' : '#4a5a7a',
+                          display: 'flex', alignItems: 'center', gap: 6
+                        }}>
+                          <span style={{ color: agent.active ? agent.color : '#4a5a7a' }}>•</span> {log}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              </motion.div>
             ))}
-          </AnimatePresence>
-        </motion.div>
+          </motion.div>
+        )}
 
         {/* Invite Modal */}
         <AnimatePresence>
