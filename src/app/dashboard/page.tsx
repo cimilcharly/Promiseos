@@ -50,7 +50,7 @@ interface RelationshipBundle {
 }
 
 export default function DashboardPage() {
-  const { user, showToast, triggerSimulatedExtraction, addCommitment } = useApp();
+  const { user, showToast, triggerSimulatedExtraction, addCommitment, commitments } = useApp();
   const [consents, setConsents] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [emails, setEmails] = useState<MockEmail[]>([]);
@@ -202,6 +202,155 @@ export default function DashboardPage() {
       if (error) throw error;
     } catch (err: any) {
       showToast('⚠️ Google auth failed: ' + err.message, 'error');
+    }
+  };
+
+  const handleExportCSV = () => {
+    try {
+      const headers = ['Task', 'Owner', 'Deadline', 'Status', 'Priority', 'Created At'];
+      const rows = commitments.map(c => [
+        `"${(c.task || '').replace(/"/g, '""')}"`,
+        `"${(c.owner || '').replace(/"/g, '""')}"`,
+        `"${(c.deadline || '').replace(/"/g, '""')}"`,
+        `"${c.status}"`,
+        `"${c.priority}"`,
+        `"${c.createdAt || ''}"`
+      ]);
+      const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', `PromiseOS_Commitments_Report_${new Date().toISOString().split('T')[0]}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      showToast('📊 CSV Report downloaded successfully!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('❌ Failed to export CSV report', 'error');
+    }
+  };
+
+  const handleExportPDF = () => {
+    try {
+      const reportWindow = window.open('', '_blank');
+      if (!reportWindow) {
+        showToast('⚠️ Pop-up blocked! Please allow pop-ups to print the report.', 'error');
+        return;
+      }
+
+      // Calculate statistics
+      const total = commitments.length;
+      const completed = commitments.filter(c => c.status === 'completed').length;
+      const active = commitments.filter(c => c.status !== 'completed' && c.status !== 'overdue').length;
+      const overdue = commitments.filter(c => c.status === 'overdue').length;
+      const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
+
+      // Group by category/status
+      const commitmentRowsHTML = commitments.map(c => `
+        <tr style="border-bottom: 1px solid #e2e8f0;">
+          <td style="padding: 12px; font-size: 14px; color: #1e293b; font-weight: 500;">${c.task}</td>
+          <td style="padding: 12px; font-size: 14px; color: #1e293b;">${c.owner}</td>
+          <td style="padding: 12px; font-size: 14px; color: #475569;">${c.deadline}</td>
+          <td style="padding: 12px; font-size: 14px; font-weight: 600; text-transform: uppercase;">
+            <span style="padding: 4px 8px; border-radius: 4px; font-size: 11px;
+              background-color: ${c.status === 'completed' ? '#dcfce7' : c.status === 'overdue' ? '#fee2e2' : '#f1f5f9'};
+              color: ${c.status === 'completed' ? '#15803d' : c.status === 'overdue' ? '#b91c1c' : '#475569'};">
+              ${c.status}
+            </span>
+          </td>
+          <td style="padding: 12px; font-size: 14px; text-transform: capitalize; color: #475569;">${c.priority}</td>
+        </tr>
+      `).join('');
+
+      const htmlContent = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>PromiseOS Commitments Report</title>
+          <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+          <style>
+            body {
+              font-family: 'Inter', sans-serif;
+              color: #0f172a;
+              background: #ffffff;
+              margin: 40px;
+            }
+            h1, h2, h3 {
+              font-family: 'Outfit', sans-serif;
+            }
+            @media print {
+              .no-print { display: none !important; }
+              body { margin: 20px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="no-print" style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+            <span style="font-size: 14px; color: #475569;">📄 Print or Save this document to export as a clean PDF.</span>
+            <button onclick="window.print()" style="background: #1e293b; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: 600; cursor: pointer;">
+              Print / Save PDF
+            </button>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #0f172a; padding-bottom: 20px; margin-bottom: 30px;">
+            <div>
+              <h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.02em;">PromiseOS</h1>
+              <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Personal Intelligence Command Report</div>
+            </div>
+            <div style="text-align: right;">
+              <h3 style="margin: 0; font-size: 16px; font-weight: 600; text-transform: uppercase; color: #64748b;">Workspace Report</h3>
+              <div style="font-size: 12px; color: #64748b; margin-top: 4px;">Date: ${new Date().toLocaleDateString()}</div>
+            </div>
+          </div>
+
+          <!-- Summary Cards -->
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 30px;">
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 8px;">
+              <div style="font-size: 12px; color: #64748b; text-transform: uppercase;">Total Commitments</div>
+              <div style="font-size: 24px; font-weight: 700; margin-top: 4px;">${total}</div>
+            </div>
+            <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px;">
+              <div style="font-size: 12px; color: #15803d; text-transform: uppercase;">Completed</div>
+              <div style="font-size: 24px; font-weight: 700; margin-top: 4px; color: #15803d;">${completed}</div>
+            </div>
+            <div style="background: #fef2f2; border: 1px solid #fecaca; padding: 16px; border-radius: 8px;">
+              <div style="font-size: 12px; color: #b91c1c; text-transform: uppercase;">Overdue</div>
+              <div style="font-size: 24px; font-weight: 700; margin-top: 4px; color: #b91c1c;">${overdue}</div>
+            </div>
+            <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 16px; border-radius: 8px;">
+              <div style="font-size: 12px; color: #1d4ed8; text-transform: uppercase;">Completion Rate</div>
+              <div style="font-size: 24px; font-weight: 700; margin-top: 4px; color: #1d4ed8;">${completionRate}%</div>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <table style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+              <tr style="border-bottom: 2px solid #e2e8f0;">
+                <th style="padding: 12px; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #cbd5e1;">Commitment / Task</th>
+                <th style="padding: 12px; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #cbd5e1;">Owner</th>
+                <th style="padding: 12px; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #cbd5e1;">Deadline</th>
+                <th style="padding: 12px; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #cbd5e1;">Status</th>
+                <th style="padding: 12px; font-size: 12px; text-transform: uppercase; color: #64748b; border-bottom: 2px solid #cbd5e1;">Priority</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${commitmentRowsHTML || '<tr><td colspan="5" style="text-align: center; padding: 20px; color: #64748b;">No active commitments in this workspace.</td></tr>'}
+            </tbody>
+          </table>
+        </body>
+        </html>
+      `;
+
+      reportWindow.document.write(htmlContent);
+      reportWindow.document.close();
+      showToast('📄 PDF Report generated!', 'success');
+    } catch (err) {
+      console.error(err);
+      showToast('❌ Failed to generate PDF report', 'error');
     }
   };
 
@@ -1227,9 +1376,33 @@ export default function DashboardPage() {
               <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.95rem', color: '#f0f6ff', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <CheckSquare size={16} color="#ec4899" /> Task Center
               </h3>
-              <span style={{ fontSize: '0.72rem', color: '#ec4899', background: 'rgba(236,72,153,0.1)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
-                {filteredTasks.length} PENDING
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button
+                  onClick={handleExportCSV}
+                  title="Export commitments to CSV"
+                  style={{
+                    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)',
+                    borderRadius: 6, padding: '4px 10px', fontSize: '0.72rem', color: '#8899bb',
+                    cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 4
+                  }}
+                >
+                  Export CSV
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  title="Generate print-friendly PDF report"
+                  style={{
+                    background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.15)',
+                    borderRadius: 6, padding: '4px 10px', fontSize: '0.72rem', color: '#00d4ff',
+                    cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 4
+                  }}
+                >
+                  Generate PDF
+                </button>
+                <span style={{ fontSize: '0.72rem', color: '#ec4899', background: 'rgba(236,72,153,0.1)', padding: '2px 8px', borderRadius: 6, fontWeight: 700 }}>
+                  {filteredTasks.length} PENDING
+                </span>
+              </div>
             </div>
 
             {/* Quick Add Custom Task Bar */}
