@@ -1026,8 +1026,8 @@ export default function DashboardPage() {
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
             style={{
-              background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08) 0%, rgba(245, 158, 11, 0.08) 100%)',
-              border: '1px solid rgba(239, 68, 68, 0.25)',
+              background: 'rgba(239, 68, 68, 0.04)',
+              border: '1px solid rgba(239, 68, 68, 0.15)',
               borderRadius: 16, padding: '16px 24px', marginBottom: 24,
               display: 'flex', justifyContent: 'space-between', alignItems: 'center',
             }}
@@ -1035,8 +1035,8 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <AlertTriangle size={20} color="#ef4444" />
               <div>
-                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#f0f6ff' }}>Demo Sandbox (Mock Data) Active</div>
-                <div style={{ fontSize: '0.78rem', color: '#8899bb', marginTop: 2 }}>
+                <div style={{ fontSize: '0.88rem', fontWeight: 700, color: '#ef4444' }}>Demo Sandbox (Mock Data) Active</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: 2 }}>
                   Your Google connection is missing or expired. Connect Gmail to sync your actual emails, hackathon deadlines, and commitments.
                 </div>
               </div>
@@ -1044,9 +1044,9 @@ export default function DashboardPage() {
             <button
               onClick={handleGoogleLogin}
               style={{
-                background: 'linear-gradient(135deg, #ef4444, #f59e0b)',
+                background: '#ef4444',
                 border: 'none', borderRadius: 10, padding: '8px 16px', fontSize: '0.78rem', color: '#fff',
-                fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.2)'
+                fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 12px rgba(239, 68, 68, 0.1)'
               }}
             >
               Connect Google Account
@@ -1059,131 +1059,133 @@ export default function DashboardPage() {
           <>
             {/* Hero Section (AI Daily Briefing - Persona Customized) */}
             <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.45 }}
-          style={{
-            background: 'linear-gradient(135deg, rgba(0, 212, 255, 0.06) 0%, rgba(124, 58, 237, 0.06) 100%)',
-            border: '1px solid rgba(0, 212, 255, 0.15)',
-            borderRadius: 20, padding: '24px 32px', marginBottom: 28,
-            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          }}
-        >
-          <div style={{ maxWidth: '75%' }}>
-            <style dangerouslySetInnerHTML={{ __html: `
-              @keyframes bounce {
-                0%, 100% { transform: scaleY(0.4); }
-                50% { transform: scaleY(1.2); }
-              }
-              .audio-wave-bar {
-                animation: bounce 0.8s ease-in-out infinite;
-                transform-origin: bottom;
-              }
-              .audio-wave-bar:nth-child(2) { animation-delay: 0.15s; }
-              .audio-wave-bar:nth-child(3) { animation-delay: 0.3s; }
-              .audio-wave-bar:nth-child(4) { animation-delay: 0.45s; }
-            ` }} />
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.72rem', background: 'rgba(0, 212, 255, 0.12)', color: '#00d4ff', padding: '3px 10px', borderRadius: 99, fontWeight: 700 }}>
-                AI DAILY BRIEFING ({persona.toUpperCase()})
-              </span>
-              
-              <button
-                onClick={handleToggleVoiceBrief}
-                style={{
-                  background: isPlayingBrief ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0, 212, 255, 0.12)',
-                  border: isPlayingBrief ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(0, 212, 255, 0.25)',
-                  borderRadius: 20, padding: '4px 12px', fontSize: '0.68rem', color: isPlayingBrief ? '#f43f5e' : '#00d4ff',
-                  display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s', outline: 'none'
-                }}
-              >
-                {isPlayingBrief ? <Pause size={10} /> : <Play size={10} />}
-                {isPlayingBrief ? 'Stop Briefing' : 'Listen to Briefing'}
-              </button>
-
-              {isPlayingBrief && (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 12, paddingBottom: 2 }}>
-                  <span className="audio-wave-bar" style={{ width: 2, height: 6, background: '#00d4ff', borderRadius: 1 }} />
-                  <span className="audio-wave-bar" style={{ width: 2, height: 12, background: '#00d4ff', borderRadius: 1 }} />
-                  <span className="audio-wave-bar" style={{ width: 2, height: 8, background: '#00d4ff', borderRadius: 1 }} />
-                  <span className="audio-wave-bar" style={{ width: 2, height: 4, background: '#00d4ff', borderRadius: 1 }} />
-                </div>
-              )}
-            </div>
-            <h2 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.4rem', color: '#f0f6ff', marginTop: 10, marginBottom: 8 }}>
-              Good Morning, Charlie.
-            </h2>
-            <p style={{ color: '#8899bb', fontSize: '0.88rem', lineHeight: 1.6 }}>
-              {getHeroBriefingText()}
-            </p>
-          </div>
-
-          <div style={{ textAlign: 'center', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.06)', padding: '16px 24px', borderRadius: 16 }}>
-            <div style={{ fontSize: '0.72rem', color: '#8899bb', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Productivity Score</div>
-            <div style={{ fontSize: '2.2rem', fontWeight: 800, color: '#00d4ff', fontFamily: 'Outfit, sans-serif', margin: '4px 0' }}>88%</div>
-            <div style={{ fontSize: '0.68rem', color: '#10b981', display: 'flex', alignItems: 'center', gap: 4 }}>
-              <TrendingUp size={10} /> +3% learning feedback loop active
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Suggested Insights - Confidence Review Gate */}
-        <AnimatePresence>
-          {suggestedInsights.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="glass-card"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45 }}
               style={{
-                borderColor: 'rgba(245, 158, 11, 0.3)',
-                background: 'rgba(245, 158, 11, 0.02)',
-                padding: 20,
-                marginBottom: 28,
-                overflow: 'hidden'
+                background: 'var(--bg-card)',
+                border: '1px solid var(--border-subtle)',
+                borderRadius: 20, padding: '24px 32px', marginBottom: 28,
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                boxShadow: 'var(--shadow-card)'
               }}
             >
-              <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: '#f59e0b', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <AlertTriangle size={15} /> AI Suggested Insights (Needs Confirmation)
-              </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {suggestedInsights.map((item) => (
-                  <div key={item.id} style={{
-                    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    padding: '10px 14px', background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10
-                  }}>
-                    <div style={{ fontSize: '0.8rem', color: '#f0f6ff' }}>
-                      <strong>{item.insights.category}:</strong> {item.insights.summary}{' '}
-                      <span style={{ color: '#f59e0b', fontSize: '0.72rem', marginLeft: 6 }}>(Confidence: {Math.round((item.insights.categoryConfidence || 0.8) * 100)}%)</span>
+              <div style={{ maxWidth: '75%' }}>
+                <style dangerouslySetInnerHTML={{ __html: `
+                  @keyframes bounce {
+                    0%, 100% { transform: scaleY(0.4); }
+                    50% { transform: scaleY(1.2); }
+                  }
+                  .audio-wave-bar {
+                    animation: bounce 0.8s ease-in-out infinite;
+                    transform-origin: bottom;
+                  }
+                  .audio-wave-bar:nth-child(2) { animation-delay: 0.15s; }
+                  .audio-wave-bar:nth-child(3) { animation-delay: 0.3s; }
+                  .audio-wave-bar:nth-child(4) { animation-delay: 0.45s; }
+                ` }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.72rem', background: 'var(--bg-secondary)', color: 'var(--text-primary)', padding: '3px 10px', borderRadius: 99, fontWeight: 700, border: '1px solid var(--border-subtle)' }}>
+                    AI DAILY BRIEFING ({persona.toUpperCase()})
+                  </span>
+                  
+                  <button
+                    onClick={handleToggleVoiceBrief}
+                    style={{
+                      background: isPlayingBrief ? 'rgba(239, 68, 68, 0.08)' : 'var(--bg-secondary)',
+                      border: isPlayingBrief ? '1px solid rgba(239, 68, 68, 0.2)' : '1px solid var(--border-subtle)',
+                      borderRadius: 20, padding: '4px 12px', fontSize: '0.68rem', color: isPlayingBrief ? 'var(--brand-rose)' : 'var(--text-primary)',
+                      display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s', outline: 'none'
+                    }}
+                  >
+                    {isPlayingBrief ? <Pause size={10} /> : <Play size={10} />}
+                    {isPlayingBrief ? 'Stop Briefing' : 'Listen to Briefing'}
+                  </button>
+
+                  {isPlayingBrief && (
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 2, height: 12, paddingBottom: 2 }}>
+                      <span className="audio-wave-bar" style={{ width: 2, height: 6, background: 'var(--brand-purple)', borderRadius: 1 }} />
+                      <span className="audio-wave-bar" style={{ width: 2, height: 12, background: 'var(--brand-purple)', borderRadius: 1 }} />
+                      <span className="audio-wave-bar" style={{ width: 2, height: 8, background: 'var(--brand-purple)', borderRadius: 1 }} />
+                      <span className="audio-wave-bar" style={{ width: 2, height: 4, background: 'var(--brand-purple)', borderRadius: 1 }} />
                     </div>
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      <button
-                        onClick={() => handleFeedback(item.id, 'approved')}
-                        style={{
-                          background: 'rgba(16,185,129,0.1)', border: '1px solid rgba(16,185,129,0.3)',
-                          borderRadius: 6, padding: '4px 10px', color: '#10b981', fontSize: '0.72rem', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 4
-                        }}
-                      >
-                        <ThumbsUp size={11} /> Approve
-                      </button>
-                      <button
-                        onClick={() => handleFeedback(item.id, 'rejected')}
-                        style={{
-                          background: 'rgba(244,63,94,0.1)', border: '1px solid rgba(244,63,94,0.3)',
-                          borderRadius: 6, padding: '4px 10px', color: '#f43f5e', fontSize: '0.72rem', cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 4
-                        }}
-                      >
-                        <ThumbsDown size={11} /> Reject
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+                <h2 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.4rem', color: 'var(--text-primary)', marginTop: 10, marginBottom: 8 }}>
+                  Good Morning, Charlie.
+                </h2>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem', lineHeight: 1.6 }}>
+                  {getHeroBriefingText()}
+                </p>
+              </div>
+
+              <div style={{ textAlign: 'center', background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', padding: '16px 24px', borderRadius: 16 }}>
+                <div style={{ fontSize: '0.72rem', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Productivity Score</div>
+                <div style={{ fontSize: '2.2rem', fontWeight: 800, color: 'var(--text-primary)', fontFamily: 'Outfit, sans-serif', margin: '4px 0' }}>88%</div>
+                <div style={{ fontSize: '0.68rem', color: 'var(--brand-emerald)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <TrendingUp size={10} /> +3% learning feedback loop active
+                </div>
               </div>
             </motion.div>
-          )}
-        </AnimatePresence>
+
+            {/* Suggested Insights - Confidence Review Gate */}
+            <AnimatePresence>
+              {suggestedInsights.length > 0 && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="glass-card"
+                  style={{
+                    borderColor: 'var(--border-subtle)',
+                    background: 'var(--bg-card)',
+                    padding: 20,
+                    marginBottom: 28,
+                    overflow: 'hidden',
+                    boxShadow: 'var(--shadow-card)'
+                  }}
+                >
+                  <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <AlertTriangle size={15} color="var(--brand-amber)" /> AI Suggested Insights (Needs Confirmation)
+                  </h3>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                    {suggestedInsights.map((item) => (
+                      <div key={item.id} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '10px 14px', background: 'var(--bg-secondary)', border: '1px solid var(--border-subtle)', borderRadius: 10
+                      }}>
+                        <div style={{ fontSize: '0.8rem', color: 'var(--text-primary)' }}>
+                          <strong>{item.insights.category}:</strong> {item.insights.summary}{' '}
+                          <span style={{ color: 'var(--text-secondary)', fontSize: '0.72rem', marginLeft: 6 }}>(Confidence: {Math.round((item.insights.categoryConfidence || 0.8) * 100)}%)</span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={() => handleFeedback(item.id, 'approved')}
+                            style={{
+                              background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)',
+                              borderRadius: 6, padding: '4px 10px', color: '#10b981', fontSize: '0.72rem', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 4
+                            }}
+                          >
+                            <ThumbsUp size={11} /> Approve
+                          </button>
+                          <button
+                            onClick={() => handleFeedback(item.id, 'rejected')}
+                            style={{
+                              background: 'rgba(244,63,94,0.08)', border: '1px solid rgba(244,63,94,0.2)',
+                              borderRadius: 6, padding: '4px 10px', color: '#f43f5e', fontSize: '0.72rem', cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', gap: 4
+                            }}
+                          >
+                            <ThumbsDown size={11} /> Reject
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
       </>
     )}
 
