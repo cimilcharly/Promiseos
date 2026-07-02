@@ -111,19 +111,17 @@ export default function Sidebar() {
           </div>
         </div>
 
-        {user && (
-          <button
-            onClick={signOut}
-            title="Sign Out"
-            style={{
-              background: 'rgba(244, 63, 94, 0.1)', border: 'none', borderRadius: 8,
-              width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-              cursor: 'pointer', color: '#f43f5e', flexShrink: 0,
-            }}
-          >
-            <LogOut size={14} />
-          </button>
-        )}
+        <button
+          onClick={signOut}
+          title="Sign Out"
+          style={{
+            background: 'rgba(244, 63, 94, 0.1)', border: 'none', borderRadius: 8,
+            width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            cursor: 'pointer', color: '#f43f5e', flexShrink: 0,
+          }}
+        >
+          <LogOut size={14} />
+        </button>
       </div>
     </aside>
   );
