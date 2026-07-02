@@ -2,29 +2,29 @@
 @import "tailwindcss";
 
 :root {
-  --bg-primary: #070b14;
-  --bg-secondary: #0d1424;
-  --bg-card: rgba(13, 20, 36, 0.8);
-  --bg-glass: rgba(255, 255, 255, 0.04);
-  --bg-glass-hover: rgba(255, 255, 255, 0.07);
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-card: #ffffff;
+  --bg-glass: rgba(15, 23, 42, 0.03);
+  --bg-glass-hover: rgba(15, 23, 42, 0.06);
   
-  --brand-cyan: #00d4ff;
-  --brand-purple: #7c3aed;
-  --brand-violet: #a855f7;
+  --brand-cyan: #475569;
+  --brand-purple: #1e293b;
+  --brand-violet: #334155;
   --brand-pink: #ec4899;
   --brand-emerald: #10b981;
   --brand-amber: #f59e0b;
-  --brand-rose: #f43f5e;
+  --brand-rose: #ef4444;
   
-  --text-primary: #f0f6ff;
-  --text-secondary: #8899bb;
-  --text-muted: #4a5a7a;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
   
-  --border-subtle: rgba(255, 255, 255, 0.06);
-  --border-glow: rgba(0, 212, 255, 0.2);
+  --border-subtle: rgba(15, 23, 42, 0.08);
+  --border-glow: rgba(15, 23, 42, 0.15);
   
-  --shadow-card: 0 4px 32px rgba(0, 0, 0, 0.4);
-  --shadow-glow: 0 0 40px rgba(0, 212, 255, 0.08);
+  --shadow-card: 0 10px 30px rgba(15, 23, 42, 0.04);
+  --shadow-glow: 0 0 30px rgba(15, 23, 42, 0.02);
   
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -53,8 +53,8 @@ body {
 /* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(124, 58, 237, 0.4); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(124, 58, 237, 0.7); }
+::-webkit-scrollbar-thumb { background: rgba(71, 85, 105, 0.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(71, 85, 105, 0.4); }
 
 /* ── Typography ── */
 h1, h2, h3, h4, h5 {
@@ -64,16 +64,15 @@ h1, h2, h3, h4, h5 {
 
 /* ── Glass Card ── */
 .glass-card {
-  background: var(--bg-glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
   transition: all 0.2s ease;
 }
 .glass-card:hover {
-  background: var(--bg-glass-hover);
-  border-color: rgba(255,255,255,0.1);
+  background: var(--bg-secondary);
+  border-color: var(--border-glow);
 }
 
 /* ── Gradient Text ── */
@@ -282,7 +281,7 @@ h1, h2, h3, h4, h5 {
 
 /* ── Sidebar ── */
 .sidebar {
-  background: rgba(7, 11, 20, 0.95);
+  background: var(--bg-card);
   border-right: 1px solid var(--border-subtle);
   width: 240px;
   min-height: 100vh;
@@ -312,13 +311,13 @@ h1, h2, h3, h4, h5 {
   text-align: left;
 }
 .sidebar-link:hover {
-  background: var(--bg-glass);
+  background: var(--bg-secondary);
   color: var(--text-primary);
 }
 .sidebar-link.active {
-  background: linear-gradient(135deg, rgba(0, 212, 255, 0.12), rgba(124, 58, 237, 0.12));
-  color: var(--brand-cyan);
-  border: 1px solid rgba(0, 212, 255, 0.15);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
 }
 
 /* ── Main Content ── */

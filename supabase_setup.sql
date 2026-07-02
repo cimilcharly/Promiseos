@@ -177,3 +177,27 @@ $$ language plpgsql security definer;
 create or replace trigger on_auth_user_created
     after insert on auth.users
     for each row execute procedure public.handle_new_user();
+
+-- Trigger to automatically update member counts in organizations table when profiles are changed
+create or replace function public.update_org_member_count()
+returns trigger as $$
+begin
+    if (tg_op = 'INSERT' or tg_op = 'UPDATE') then
+        update public.organizations 
+        set member_count = (select count(*) from public.profiles where org_id = new.org_id)
+        where id = new.org_id;
+    end if;
+    if (tg_op = 'DELETE' or tg_op = 'UPDATE') then
+        if old.org_id is not null then
+            update public.organizations 
+            set member_count = (select count(*) from public.profiles where org_id = old.org_id)
+            where id = old.org_id;
+        end if;
+    end if;
+    return null;
+end;
+$$ language plpgsql security definer;
+
+create or replace trigger on_profile_changed
+    after insert or update or delete on public.profiles
+    for each row execute procedure public.update_org_member_count();

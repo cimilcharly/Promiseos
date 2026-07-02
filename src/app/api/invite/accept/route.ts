@@ -63,16 +63,20 @@ export async function POST(req: Request) {
       .update({ status: 'accepted' })
       .eq('id', invite.id);
 
-    // Update organization member count
-    const { count } = await supabase
-      .from('profiles')
-      .select('*', { count: 'exact', head: true })
-      .eq('org_id', invite.org_id);
+    try {
+      // Update organization member count
+      const { count } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('org_id', invite.org_id);
 
-    await supabase
-      .from('organizations')
-      .update({ member_count: count || 1 })
-      .eq('id', invite.org_id);
+      await supabase
+        .from('organizations')
+        .update({ member_count: count || 1 })
+        .eq('id', invite.org_id);
+    } catch (orgErr) {
+      console.warn('Non-blocking: could not update organization member count due to RLS', orgErr);
+    }
 
     return NextResponse.json({
       success: true,
