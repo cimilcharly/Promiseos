@@ -10,7 +10,7 @@ import {
   Eye, Clock, Sparkles, Filter, Trash2, ArrowUpRight,
   Send, Bot, User as UserIcon, Plus, X, BarChart3, TrendingUp,
   ThumbsUp, ThumbsDown, Luggage, Layers, Video, PlusCircle, Copy,
-  Award, ShieldCheck, Newspaper, Play, Pause, Network, Volume2, Mic, MicOff
+  Award, ShieldCheck, Newspaper, Play, Pause, Network, Volume2, Mic, MicOff, Notebook
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MockEmail } from '@/lib/mock_emails';
@@ -50,14 +50,14 @@ interface RelationshipBundle {
 }
 
 export default function DashboardPage() {
-  const { user, showToast } = useApp();
+  const { user, showToast, triggerSimulatedExtraction, addCommitment } = useApp();
   const [consents, setConsents] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [emails, setEmails] = useState<MockEmail[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isMockData, setIsMockData] = useState(false);
   const [activeScheduleTab, setActiveScheduleTab] = useState<'meetings' | 'deadlines'>('meetings');
-  const [activeView, setActiveView] = useState<'command-center' | 'knowledge-graph' | 'escalation-runway'>('command-center');
+  const [activeView, setActiveView] = useState<'command-center' | 'knowledge-graph' | 'escalation-runway' | 'personal-notepad'>('command-center');
   const [isPlayingBrief, setIsPlayingBrief] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -71,6 +71,24 @@ export default function DashboardPage() {
   const [isRecordingDraft, setIsRecordingDraft] = useState(false);
   const draftMediaRecorderRef = useRef<MediaRecorder | null>(null);
   const draftAudioChunksRef = useRef<Blob[]>([]);
+  // Personal Notepad states
+  const [notepadText, setNotepadText] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('promiseos_notepad_text') || '';
+    }
+    return '';
+  });
+  const [isRecordingNotepad, setIsRecordingNotepad] = useState(false);
+  const [notepadExtractedTasks, setNotepadExtractedTasks] = useState<any[]>([]);
+  const [notepadExtracting, setNotepadExtracting] = useState(false);
+
+  // Save notepad text to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('promiseos_notepad_text', notepadText);
+    }
+  }, [notepadText]);
+  
   const [syncingCalendarId, setSyncingCalendarId] = useState<string | null>(null);
   
   // Interactive Command Persona State
@@ -1017,6 +1035,18 @@ export default function DashboardPage() {
             }}
           >
             <Clock size={14} /> Escalation & Runway
+          </button>
+
+          <button
+            onClick={() => setActiveView('personal-notepad')}
+            style={{
+              background: activeView === 'personal-notepad' ? 'rgba(0, 212, 255, 0.1)' : 'transparent',
+              border: activeView === 'personal-notepad' ? '1px solid rgba(0, 212, 255, 0.3)' : '1px solid transparent',
+              borderRadius: 10, padding: '8px 16px', fontSize: '0.8rem', color: activeView === 'personal-notepad' ? '#00d4ff' : '#8899bb',
+              fontWeight: 700, cursor: 'pointer', transition: 'all 0.2s', display: 'flex', alignItems: 'center', gap: 8
+            }}
+          >
+            <Notebook size={14} /> Personal Notepad
           </button>
         </div>
 
@@ -2121,6 +2151,238 @@ export default function DashboardPage() {
                     <span style={{ fontSize: '0.85rem', fontWeight: 800, color: '#a855f7' }}>-{sub.cost}</span>
                   </div>
                 ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Personal Notepad (Text & Voice) */}
+        {activeView === 'personal-notepad' && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}
+          >
+            {/* Notepad Editor (Left side) */}
+            <div className="glass-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1rem', color: '#f0f6ff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Notebook size={18} color="#00d4ff" /> Personal Smart Notepad
+                </h3>
+                <p style={{ color: '#8899bb', fontSize: '0.75rem', marginTop: 4 }}>
+                  Draft notes, write raw transcripts, or dictate tasks directly.
+                </p>
+              </div>
+
+              <textarea
+                value={notepadText}
+                onChange={(e) => setNotepadText(e.target.value)}
+                placeholder="Type your notes or voice-dictate them here... E.g., 'Draft project roadmap by Friday, send invoice to Apex by tomorrow, and follow up with Charlie.'"
+                style={{
+                  background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: 12,
+                  padding: 16,
+                  color: '#f0f6ff',
+                  fontSize: '0.85rem',
+                  minHeight: 280,
+                  fontFamily: 'inherit',
+                  resize: 'vertical',
+                  outline: 'none',
+                  lineHeight: 1.5,
+                }}
+              />
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '0.7rem', color: '#4a5a7a' }}>
+                  {notepadText ? `${notepadText.length} characters` : 'Empty note'} • Autosaved
+                </span>
+
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button
+                    onClick={() => {
+                      if (isRecordingNotepad) {
+                        showToast('🎙️ Dictation stopped.', 'info');
+                        setIsRecordingNotepad(false);
+                      } else {
+                        setIsRecordingNotepad(true);
+                        showToast('🎙️ Dictating... Speak into your mic.', 'info');
+                        // Local Speech Recognition implementation
+                        if (typeof window !== 'undefined') {
+                          const SpeechReg = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+                          if (SpeechReg) {
+                            const rec = new SpeechReg();
+                            rec.continuous = false;
+                            rec.interimResults = false;
+                            rec.lang = 'en-US';
+                            rec.onresult = (e: any) => {
+                              const trans = e.results[0][0].transcript;
+                              setNotepadText(prev => prev + (prev ? ' ' : '') + trans);
+                              showToast('🎙️ Speech transcribed!', 'success');
+                            };
+                            rec.onerror = () => {
+                              showToast('⚠️ Speech recognition error.', 'error');
+                            };
+                            rec.onend = () => {
+                              setIsRecordingNotepad(false);
+                            };
+                            rec.start();
+                          } else {
+                            // Fallback simulation
+                            setTimeout(() => {
+                              const simulationNotes = [
+                                "Follow up with Apex agency about billing cycles by Tuesday",
+                                "Prepare presentation slides for the weekly syncing event",
+                                "Send the calendar event link to Sarah Jones immediately"
+                              ];
+                              const randomNote = simulationNotes[Math.floor(Math.random() * simulationNotes.length)];
+                              setNotepadText(prev => prev + (prev ? '\n' : '') + randomNote);
+                              showToast('🎙️ Mock dictation transcribed successfully!', 'success');
+                              setIsRecordingNotepad(false);
+                            }, 2500);
+                          }
+                        }
+                      }
+                    }}
+                    style={{
+                      background: isRecordingNotepad ? 'rgba(239, 68, 68, 0.15)' : 'rgba(0, 212, 255, 0.1)',
+                      border: isRecordingNotepad ? '1px solid rgba(239, 68, 68, 0.3)' : '1px solid rgba(0, 212, 255, 0.25)',
+                      borderRadius: 10, padding: '8px 16px', fontSize: '0.78rem', color: isRecordingNotepad ? '#f43f5e' : '#00d4ff',
+                      display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', transition: 'all 0.2s'
+                    }}
+                  >
+                    {isRecordingNotepad ? <MicOff size={14} /> : <Mic size={14} />}
+                    {isRecordingNotepad ? 'Listening...' : 'Dictate'}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      if (confirm('Clear your note?')) {
+                        setNotepadText('');
+                        setNotepadExtractedTasks([]);
+                      }
+                    }}
+                    disabled={!notepadText}
+                    style={{
+                      background: 'rgba(244, 63, 94, 0.1)',
+                      border: '1px solid rgba(244, 63, 94, 0.2)',
+                      borderRadius: 10, padding: '8px 16px', fontSize: '0.78rem', color: '#f43f5e',
+                      cursor: notepadText ? 'pointer' : 'not-allowed', opacity: notepadText ? 1 : 0.5, transition: 'all 0.2s'
+                    }}
+                  >
+                    <Trash2 size={14} /> Clear
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* AI Task Parser (Right side) */}
+            <div className="glass-card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div>
+                <h3 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1rem', color: '#f0f6ff', display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Sparkles size={18} color="#7c3aed" /> AI Commitment Extractor
+                </h3>
+                <p style={{ color: '#8899bb', fontSize: '0.75rem', marginTop: 4 }}>
+                  Automatically extract promises and actionable goals from your notes.
+                </p>
+              </div>
+
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {!notepadText && (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#4a5a7a', border: '1px dashed rgba(255,255,255,0.05)', borderRadius: 12, padding: 24, textAlign: 'center' }}>
+                    <Notebook size={32} style={{ marginBottom: 12, opacity: 0.3 }} />
+                    <p style={{ fontSize: '0.8rem' }}>Write or record a note on the left to activate AI extraction.</p>
+                  </div>
+                )}
+
+                {notepadText && notepadExtractedTasks.length === 0 && !notepadExtracting && (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#8899bb', border: '1px dashed rgba(255,255,255,0.05)', borderRadius: 12, padding: 24, textAlign: 'center' }}>
+                    <Sparkles size={32} color="#7c3aed" style={{ marginBottom: 12 }} />
+                    <p style={{ fontSize: '0.8rem', marginBottom: 16 }}>Your note is ready to be parsed for commitments.</p>
+                    <button
+                      onClick={async () => {
+                        setNotepadExtracting(true);
+                        try {
+                          // Simulating/running extraction using the app context trigger
+                          const items = await triggerSimulatedExtraction(notepadText, 'Personal Notepad Note');
+                          setNotepadExtractedTasks(items);
+                          showToast(`✨ Extracted ${items.length} tasks!`, 'success');
+                        } catch (err) {
+                          console.error(err);
+                          showToast('❌ Extraction failed.', 'error');
+                        } finally {
+                          setNotepadExtracting(false);
+                        }
+                      }}
+                      className="btn-primary"
+                      style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      Parse note for tasks
+                    </button>
+                  </div>
+                )}
+
+                {notepadExtracting && (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#8899bb' }}>
+                    <RefreshCw size={32} className="animate-spin" color="#00d4ff" style={{ marginBottom: 12 }} />
+                    <p style={{ fontSize: '0.85rem' }}>Gemini is extracting tasks from your note...</p>
+                  </div>
+                )}
+
+                {notepadExtractedTasks.length > 0 && !notepadExtracting && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, overflowY: 'auto', maxHeight: 320 }}>
+                    <div style={{ fontSize: '0.75rem', fontWeight: 700, color: '#8899bb' }}>
+                      Preview Extracted Commitments:
+                    </div>
+                    {notepadExtractedTasks.map((t, idx) => (
+                      <div key={idx} style={{ background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.04)', borderRadius: 10, padding: 12 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#f0f6ff' }}>{t.task}</span>
+                          <span style={{ fontSize: '0.65rem', background: 'rgba(0,212,255,0.08)', color: '#00d4ff', padding: '2px 6px', borderRadius: 4 }}>
+                            {t.owner}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.7rem', color: '#8899bb', marginTop: 6, display: 'flex', gap: 12 }}>
+                          <span>Deadline: {t.deadline}</span>
+                        </div>
+                      </div>
+                    ))}
+
+                    <div style={{ marginTop: 'auto', paddingTop: 12, display: 'flex', gap: 10 }}>
+                      <button
+                        onClick={async () => {
+                          for (const t of notepadExtractedTasks) {
+                            await addCommitment({
+                              task: t.task,
+                              owner: t.owner,
+                              deadline: t.deadline,
+                              deadlineIso: t.deadlineIso || new Date().toISOString().split('T')[0],
+                              status: 'new',
+                              priority: 'medium',
+                            });
+                          }
+                          showToast('🚀 All tasks imported to board!', 'success');
+                          setNotepadExtractedTasks([]);
+                          setNotepadText('');
+                        }}
+                        className="btn-primary"
+                        style={{ flex: 1, fontSize: '0.78rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      >
+                        <CheckCircle size={14} /> Add all to Dashboard Board
+                      </button>
+
+                      <button
+                        onClick={() => setNotepadExtractedTasks([])}
+                        style={{
+                          background: 'transparent', border: '1px solid rgba(255,255,255,0.08)',
+                          borderRadius: 10, padding: '8px 16px', fontSize: '0.78rem', color: '#8899bb', cursor: 'pointer'
+                        }}
+                      >
+                        Reset
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </motion.div>
