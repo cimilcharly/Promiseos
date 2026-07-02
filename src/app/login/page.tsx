@@ -117,7 +117,7 @@ export default function LoginPage() {
       alignItems: 'center',
       justifyContent: 'center',
       padding: 24,
-      background: 'var(--bg-primary)',
+      background: 'radial-gradient(circle at 50% -20%, #1a1b2e 0%, #0a0b10 100%)',
     }}>
       <motion.div
         initial={{ opacity: 0, y: 20, scale: 0.95 }}
@@ -126,11 +126,11 @@ export default function LoginPage() {
         style={{
           width: '100%',
           maxWidth: 420,
-          background: 'var(--bg-card)',
-          border: '1px solid var(--border-subtle)',
+          background: 'rgba(255, 255, 255, 0.02)',
+          border: '1px solid rgba(255, 255, 255, 0.08)',
           borderRadius: 24,
           padding: 40,
-          boxShadow: 'var(--shadow-card)',
+          boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
           position: 'relative',
           overflow: 'hidden',
         }}
@@ -138,21 +138,21 @@ export default function LoginPage() {
         {/* Glow effect */}
         <div style={{
           position: 'absolute', top: -50, left: '50%', transform: 'translateX(-50%)',
-          width: 200, height: 100, background: 'var(--brand-cyan)', filter: 'blur(80px)', opacity: 0.05,
+          width: 200, height: 100, background: '#00d4ff', filter: 'blur(80px)', opacity: 0.15,
         }} />
 
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <div style={{
-            width: 48, height: 48, borderRadius: 16, background: 'linear-gradient(135deg, var(--brand-cyan), var(--brand-purple))',
+            width: 48, height: 48, borderRadius: 16, background: 'linear-gradient(135deg, #00d4ff, #7c3aed)',
             display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px',
-            boxShadow: '0 8px 16px rgba(0,0,0,0.05)',
+            boxShadow: '0 8px 16px rgba(124, 58, 237, 0.2)',
           }}>
             <Shield size={24} color="white" />
           </div>
-          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.6rem', color: 'var(--text-primary)', marginBottom: 8 }}>
+          <h1 style={{ fontFamily: 'Outfit, sans-serif', fontWeight: 700, fontSize: '1.6rem', color: '#f0f6ff', marginBottom: 8 }}>
             {isLogin ? 'Welcome back' : 'Create an account'}
           </h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+          <p style={{ color: '#8899bb', fontSize: '0.9rem' }}>
             {isLogin ? 'Enter your details to access your dashboard' : 'Join PromiseOS and start tracking commitments'}
           </p>
         </div>
@@ -226,9 +226,9 @@ export default function LoginPage() {
                 transition={{ duration: 0.5, delay: 0.2 }}
                 style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 24, originX: 0 }}
               >
-                <div style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
-                <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap' }}>or continue with email</span>
-                <div style={{ flex: 1, height: 1, background: 'var(--border-subtle)' }} />
+                <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
+                <span style={{ fontSize: '0.8rem', color: '#8899bb', whiteSpace: 'nowrap' }}>or continue with email</span>
+                <div style={{ flex: 1, height: 1, background: 'rgba(255,255,255,0.1)' }} />
               </motion.div>
             </motion.div>
           )}
@@ -254,8 +254,8 @@ export default function LoginPage() {
           ) : (
             <form key="auth-form" onSubmit={handleAuth} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               {!isLogin && (
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Organization Name</label>
+            <div>
+              <label style={{ display: 'block', fontSize: '0.8rem', color: '#8899bb', marginBottom: 6 }}>Organization Name</label>
               <div style={{ position: 'relative' }}>
                 <input
                   type="text"
@@ -268,11 +268,11 @@ export default function LoginPage() {
               </div>
             </div>
           )}
- 
+
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Email</label>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: '#8899bb', marginBottom: 6 }}>Email</label>
             <div style={{ position: 'relative' }}>
-              <Mail size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
+              <Mail size={16} color="#8899bb" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="email"
                 required
@@ -286,9 +286,9 @@ export default function LoginPage() {
           </div>
           
           <div>
-            <label style={{ display: 'block', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: 6 }}>Password</label>
+            <label style={{ display: 'block', fontSize: '0.8rem', color: '#8899bb', marginBottom: 6 }}>Password</label>
             <div style={{ position: 'relative' }}>
-              <Lock size={16} color="var(--text-muted)" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
+              <Lock size={16} color="#8899bb" style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)' }} />
               <input
                 type="password"
                 required
@@ -335,13 +335,13 @@ export default function LoginPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.4 }}
-          style={{ marginTop: 24, textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-secondary)' }}
+          style={{ marginTop: 24, textAlign: 'center', fontSize: '0.85rem', color: '#8899bb' }}
         >
           {isLogin ? "Don't have an account? " : "Already have an account? "}
           <motion.button
-            whileHover={{ color: 'var(--brand-purple)', scale: 1.05 }}
+            whileHover={{ color: '#00d4ff', scale: 1.05 }}
             onClick={() => { setIsLogin(!isLogin); setError(null); setEmail(''); setPassword(''); setOrgName(''); setConfirmEmail(false); }}
-            style={{ background: 'none', border: 'none', color: 'var(--brand-purple)', fontWeight: 600, cursor: 'pointer' }}
+            style={{ background: 'none', border: 'none', color: '#00d4ff', fontWeight: 600, cursor: 'pointer' }}
           >
             {isLogin ? 'Sign up' : 'Log in'}
           </motion.button>
